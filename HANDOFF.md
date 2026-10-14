@@ -40,30 +40,38 @@ durable one. To sync from a session:
 
 1. In the sandbox: `bash /home/claude/sync.sh` — writes `pulse.bundle` (git history)
    and `pulse-worktree.tar.gz` to the outputs directory.
-2. Commit `pulse.bundle` to `~/Documents/fello-pulse/pulse.bundle` on the device.
+2. Commit it to `~/Documents/fello-pulse/pulse-sync.bundle` on the device.
 3. On the device: `bash infra/scripts/mirror_apply.sh` — fetches from the bundle and
    hard-resets the mirror to it. Idempotent; safe to re-run.
+
+Gotcha worth knowing: committing a file to a device path that already holds a file of
+that name can land a stale copy. Verify after every sync with
+`git bundle list-heads pulse-sync.bundle` on the device and check the hash is the
+commit you expect; if it is stale, commit under a fresh filename.
 
 A git bundle rather than a tar of `.git`, because git objects are immutable and stored
 read-only, so a tar overwrite fails on every object that already exists while a bundle
 fetch simply transfers what is new.
 
-Leftover files `_snapshot.tar.gz` and `pulse.bundle` live in the mirror folder. They are
-gitignored and harmless. The session cannot delete files in a connected folder without
-a separate delete permission, so they are left in place rather than cleaned up.
+`pulse-sync.bundle` lives in the mirror folder and is gitignored. Delete permission for
+that folder was granted in this session, which git needs anyway: git removes its own
+`.lock` files, and without that permission a single fetch leaves a lock behind and every
+later git command — including Akhil's own — fails with "File exists".
 
 ## Pushing to GitHub
 
-The Claude session's GitHub connector is **repository-scoped**: it can read and write
-repositories it was configured with, but it cannot create a new one, so `fello-pulse`
-could not be created from the session. The mirrored copy on the Mac includes the full
+The GitHub connector is linked (`gh api user` returns `akhilpdas`) but is
+**repository-scoped**: the session can act on repositories it was configured with and
+cannot create a new one. `POST /user/repos` returns 403 "sessions are bound to their
+configured repositories", and the GraphQL path `gh repo create` uses is blocked
+outright. So `fello-pulse` could not be created from the session. The mirrored copy on the Mac includes the full
 `.git` history, so pushing is two commands in a normal Terminal where Akhil's own
 credentials live:
 
 ```bash
 cd ~/Documents/fello-pulse
 # create the repo once, on github.com, named fello-pulse (private)
-git remote add origin git@github.com:akhilpdas/fello-pulse.git   # or the https URL
+git remote add origin https://github.com/akhilpdas/fello-pulse.git
 git push -u origin main
 ```
 
