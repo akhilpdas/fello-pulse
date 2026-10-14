@@ -33,6 +33,25 @@ Postgres facts for this sandbox:
   **NOSUPERUSER NOBYPASSRLS** — this is load-bearing for the RLS isolation tests)
 - database `pulse`
 
+## Keeping the mirror in sync
+
+The cloud sandbox is the working copy; `~/Documents/fello-pulse` on the Mac is the
+durable one. To sync from a session:
+
+1. In the sandbox: `bash /home/claude/sync.sh` — writes `pulse.bundle` (git history)
+   and `pulse-worktree.tar.gz` to the outputs directory.
+2. Commit `pulse.bundle` to `~/Documents/fello-pulse/pulse.bundle` on the device.
+3. On the device: `bash infra/scripts/mirror_apply.sh` — fetches from the bundle and
+   hard-resets the mirror to it. Idempotent; safe to re-run.
+
+A git bundle rather than a tar of `.git`, because git objects are immutable and stored
+read-only, so a tar overwrite fails on every object that already exists while a bundle
+fetch simply transfers what is new.
+
+Leftover files `_snapshot.tar.gz` and `pulse.bundle` live in the mirror folder. They are
+gitignored and harmless. The session cannot delete files in a connected folder without
+a separate delete permission, so they are left in place rather than cleaned up.
+
 ## Pushing to GitHub
 
 The Claude session's GitHub connector is **repository-scoped**: it can read and write
