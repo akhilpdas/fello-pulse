@@ -1,0 +1,40 @@
+[project]
+name = "pulse"
+version = "0.1.0"
+description = "Renewal-risk prioritisation for Customer Success"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "sqlalchemy>=2.0",
+  "alembic>=1.13",
+  "psycopg[binary]>=3.1",
+  "pydantic>=2.8",
+  "pydantic-settings>=2.4",
+  "scikit-learn>=1.5",
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "shap>=0.46",
+  "orjson>=3.10",
+  "python-jose[cryptography]>=3.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "isolation: proves tenant isolation at the database layer",
+  "leakage: proves point-in-time correctness",
+  "slow: runs the full pipeline",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B008"]

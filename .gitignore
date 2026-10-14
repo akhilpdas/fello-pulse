@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+node_modules/
+dist/
+data/feeds/
+artifacts/
+*.pkl
+*.joblib
+_snapshot.tar.gz
+.DS_Store
