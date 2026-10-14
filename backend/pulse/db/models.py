@@ -68,18 +68,39 @@ class TenantConfig(TenantScoped, Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
 
-    horizon_days: Mapped[int] = mapped_column(Integer, nullable=False, default=90)
-    contraction_threshold: Mapped[float] = mapped_column(
-        Numeric(5, 4), nullable=False, default=0.25
+    # server_default as well as default: these are operator-facing settings and a
+    # row inserted by any path -- a migration, a seed script, a console -- must
+    # come out with sane policy rather than nulls.
+    horizon_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=90, server_default=text("90")
     )
-    weekly_capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
-    tier_red_at: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False, default=0.35)
-    tier_amber_at: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False, default=0.15)
-    min_days_history: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
-    min_sources_with_data: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
-    suppression_days: Mapped[int] = mapped_column(Integer, nullable=False, default=14)
-    max_sends_per_cycle: Mapped[int] = mapped_column(Integer, nullable=False, default=25)
-    material_delta: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False, default=0.08)
+    contraction_threshold: Mapped[float] = mapped_column(
+        Numeric(5, 4), nullable=False, default=0.25, server_default=text("0.25")
+    )
+    weekly_capacity: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=10, server_default=text("10")
+    )
+    tier_red_at: Mapped[float] = mapped_column(
+        Numeric(5, 4), nullable=False, default=0.35, server_default=text("0.35")
+    )
+    tier_amber_at: Mapped[float] = mapped_column(
+        Numeric(5, 4), nullable=False, default=0.15, server_default=text("0.15")
+    )
+    min_days_history: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=30, server_default=text("30")
+    )
+    min_sources_with_data: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=2, server_default=text("2")
+    )
+    suppression_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=14, server_default=text("14")
+    )
+    max_sends_per_cycle: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=25, server_default=text("25")
+    )
+    material_delta: Mapped[float] = mapped_column(
+        Numeric(5, 4), nullable=False, default=0.08, server_default=text("0.08")
+    )
     connected_sources: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False,
         server_default=text("ARRAY['salesforce','gmail','zendesk','product','stripe']::text[]"),
@@ -94,7 +115,9 @@ class AppUser(TenantScoped, Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     email: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    role: Mapped[str] = mapped_column(String(16), nullable=False, default="csm")
+    role: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="csm", server_default=text("'csm'")
+    )
 
     __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_app_user_email"),)
 
@@ -131,7 +154,9 @@ class Account(TenantScoped, Base):
     )
 
     # --- outcome columns: denied to the feature layer (features/denylist.py) ---
-    lifecycle_state: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    lifecycle_state: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="active", server_default=text("'active'")
+    )
     churned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     churn_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
@@ -161,7 +186,9 @@ class IdentityLink(TenantScoped, Base):
         UUID(as_uuid=True), ForeignKey("account.id", ondelete="CASCADE"), nullable=True
     )
     method: Mapped[str] = mapped_column(String(24), nullable=False)
-    confidence: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False, default=1.0)
+    confidence: Mapped[float] = mapped_column(
+        Numeric(4, 3), nullable=False, default=1.0, server_default=text("1.0")
+    )
     first_seen_at: Mapped[datetime] = ts(server_now=True)
 
     __table_args__ = (
@@ -218,7 +245,9 @@ class IngestionWatermark(TenantScoped, Base):
     source: Mapped[str] = mapped_column(String(32), nullable=False)
     last_received_at: Mapped[datetime] = ts()
     last_cursor: Mapped[str | None] = mapped_column(Text, nullable=True)
-    events_ingested: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    events_ingested: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default=text("0")
+    )
     updated_at: Mapped[datetime] = ts(server_now=True)
 
     __table_args__ = (UniqueConstraint("tenant_id", "source", name="uq_watermark"),)
@@ -253,7 +282,9 @@ class FeatureSnapshot(TenantScoped, Base):
     values: Mapped[dict] = mapped_column(JSONB, nullable=False)
     evidence: Mapped[dict] = mapped_column(JSONB, nullable=False)
     coverage: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    days_of_history: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    days_of_history: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     feature_set_version: Mapped[str] = mapped_column(String(32), nullable=False)
     computed_at: Mapped[datetime] = ts(server_now=True)
 
@@ -287,7 +318,9 @@ class ModelVersion(Base):
     data_version: Mapped[str] = mapped_column(Text, nullable=False)
     metrics: Mapped[dict] = mapped_column(JSONB, nullable=False)
     artifact_path: Mapped[str] = mapped_column(Text, nullable=False)
-    promoted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    promoted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     promotion_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -317,8 +350,12 @@ class Score(TenantScoped, Base):
     dominant_driver: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     value_at_risk_cents: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    urgency_multiplier: Mapped[float] = mapped_column(Numeric(6, 3), nullable=False, default=1.0)
-    priority: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False, default=0)
+    urgency_multiplier: Mapped[float] = mapped_column(
+        Numeric(6, 3), nullable=False, default=1.0, server_default=text("1.0")
+    )
+    priority: Mapped[float] = mapped_column(
+        Numeric(18, 4), nullable=False, default=0, server_default=text("0")
+    )
     ranking_math: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
     created_at: Mapped[datetime] = ts(server_now=True)
@@ -347,7 +384,12 @@ class PlayAllowlist(TenantScoped, Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     play_key: Mapped[str] = mapped_column(String(48), nullable=False)
-    auto_send: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Defaults to false in the schema as well as the model: autonomous sending
+    # must be impossible to switch on by accident, including by an INSERT that
+    # simply omits the column.
+    auto_send: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     enabled_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="SET NULL"), nullable=True
     )
@@ -368,14 +410,24 @@ class AgentRun(TenantScoped, Base):
     __tablename__ = "agent_run"
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    trigger: Mapped[str] = mapped_column(String(24), nullable=False, default="schedule")
+    trigger: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="schedule", server_default=text("'schedule'")
+    )
     started_at: Mapped[datetime] = ts(server_now=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="running")
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="running", server_default=text("'running'")
+    )
     as_of: Mapped[datetime] = ts()
-    stage_counts: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    decisions_declined: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    errors: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    stage_counts: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
+    decisions_declined: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
+    errors: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (Index("ix_run_recent", "tenant_id", "started_at"),)
@@ -395,15 +447,25 @@ class Action(TenantScoped, Base):
         UUID(as_uuid=True), ForeignKey("agent_run.id", ondelete="SET NULL"), nullable=True
     )
     play_key: Mapped[str] = mapped_column(String(48), nullable=False)
-    state: Mapped[str] = mapped_column(String(24), nullable=False, default="drafted")
+    # Drafted, not sent. The default state of any outbound action is one that
+    # needs a human; see FR-034.
+    state: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="drafted", server_default=text("'drafted'")
+    )
     state_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    channel: Mapped[str] = mapped_column(String(16), nullable=False, default="email")
+    channel: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="email", server_default=text("'email'")
+    )
     subject: Mapped[str | None] = mapped_column(Text, nullable=True)
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Which writer produced the draft, so a reviewer knows whether a human is
     # editing a template or a language model's prose.
-    draft_source: Mapped[str] = mapped_column(String(16), nullable=False, default="template")
-    grounding: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    draft_source: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="template", server_default=text("'template'")
+    )
+    grounding: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
 
     created_at: Mapped[datetime] = ts(server_now=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -411,7 +473,9 @@ class Action(TenantScoped, Base):
         UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="SET NULL"), nullable=True
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
 
     __table_args__ = (
         Index("ix_action_account", "tenant_id", "account_id", "created_at"),
@@ -438,8 +502,12 @@ class WorkLease(Base):
     key: Mapped[str] = mapped_column(Text, nullable=False)
     owner: Mapped[str | None] = mapped_column(Text, nullable=True)
     leased_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    state: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
-    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    state: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", server_default=text("'pending'")
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = ts(server_now=True)
 
