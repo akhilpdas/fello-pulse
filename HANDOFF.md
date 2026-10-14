@@ -80,7 +80,7 @@ directly and the tarball mirroring can be dropped.
 
 ## Status
 
-### Done
+### Done — Phases 1–4 of 14 (T001–T027 complete, 38 tests green)
 - Spec Kit scaffolded (`specify-cli` 1.2.1.dev0, `--integration claude`, sh scripts)
 - `.specify/memory/constitution.md` — v1.0.0, five non-negotiables as enforceable
   principles with the test that proves each
@@ -109,30 +109,62 @@ directly and the tarball mirroring can be dropped.
 - **T007** `pulse/db/models.py` — all 16 entities; verified to import and produce
   13 tenant-scoped + 3 global tables with nothing unclassified
 
-### PAUSED HERE at Akhil's request — awaiting confirmation before continuing
 
-### Next (in order)
-T004 `infra/docker-compose.yml` + `infra/Makefile`
-T008 Alembic env + initial migration (tables and indexes)
-T009 RLS migration: `ENABLE` **and** `FORCE ROW LEVEL SECURITY` + tenant policies,
-     driven by `TENANT_SCOPED_TABLES`; grants to `pulse_app`
-T010 `pulse/db/session.py` — request session issuing `SET LOCAL pulse.tenant_id` inside
-     an explicit transaction, plus a separately named elevated session for cross-tenant work
-T011–T013 **isolation tests: unfiltered SELECT per table, pooled-connection claim bleed,
-     app role cannot bypass.** Do not start feature work before these pass — isolation and
-     point-in-time posture are ruinous to retrofit.
-T014–T019 generator (built before ingestion, deliberately: it is the adversary)
-then Phases 4–14 per tasks.md.
 
-### Decisions already locked (do not re-litigate without reading clarifications.md)
-- Target: P(churn or ≥25% MRR contraction within 90 days of the decision date)
-- `HistGradientBoostingClassifier` + isotonic calibration; chosen for **native NaN
-  handling** because absence is informative in this estate
-- Renewal proximity is a *ranking* multiplier, not the scoring mechanism
-- One shared model across tenants, with per-tenant and leave-one-tenant-out reporting
-- Tenant isolation via Postgres RLS + `FORCE ROW LEVEL SECURITY`, app role cannot
-  bypass; application filters are defence in depth only
-- Worker = tick loop + DB-backed leases with `FOR UPDATE SKIP LOCKED`; no broker
-- Agent acts on **material change**, not on level
-- Auto-send off by default per tenant per play; LLM drafts language only and never
-  touches ranking; system fully functional with no LLM
+---
+
+## Status as of the pause (2026-10-15)
+
+**Done and verified**
+
+- **Phase 1–2 — foundation.** Postgres 16 + Alembic (4 migrations, 16 tables).
+  Row-level security on all 13 tenant-scoped tables, `ENABLE` **and** `FORCE`,
+  `USING` + `WITH CHECK`, three roles (`pulse` owner / `pulse_app` NOBYPASSRLS /
+  `pulse_trainer` BYPASSRLS for cross-tenant training only). Tenant claim set with
+  `set_config(..., is_local => true)` so it dies with the transaction and a pooled
+  connection cannot carry one tenant's identity into the next request.
+  **17 isolation tests**, mutation-verified (see `docs/VERIFICATION.md`).
+- **Phase 3 — generator.** 5,000 accounts, **349,870 events**, 3 tenants, 96s,
+  reproducible from seed 20261015 (`data_version: dv-20261015-54c3fb70f81a`).
+  Latent mean-reverting health process with six shock types; all five sources
+  emit noisy lagged observations of it; churn drawn from it. Three deliberate
+  noise sources cap achievable AUC in the low-to-mid 0.8s.
+  **21 realism tests** that read the feeds as data rather than importing the
+  generator.
+- **Phase 4 — ingestion.** Five adapters absorbing the mid-history field rename
+  and event-type recasing; identity resolution where unresolved is a persisted,
+  reportable state and **never** creates a phantom account; idempotent batch
+  write on the natural key; watermarks advanced only after the batch commits.
+  Account dimension folded from CRM + billing, kept strictly separate from the
+  point-in-time feature path.
+  Verified: **329,096 events ingested in 39s**, ~0.6% duplicates suppressed by
+  the unique constraint, 656 unresolved identities surfaced,
+  **a second identical run inserted 0 rows**.
+
+**Bug found and fixed during verification** — the Stripe emitter only emitted
+`subscription.updated` when the 30-day invoice grid happened to land on the exact
+MRR-change date, so most contractions never reached the feed. Contraction is half
+the label, so the model would have been trained on cancellations alone. Now fires
+on the day the change happens; 152 material MRR drops in the feed against 150
+contractions in the ground truth.
+
+**Next, in order**
+
+- T028–T035 **Phase 5 features**: `denylist.py`, weekday-aligned `windows.py`,
+  declarative `registry.py` (~40 features, six driver groups per
+  `contracts/features.md`), `compute.py` taking `(tenant, account, as_of)` and
+  reading only `received_at <= as_of`. Then the leakage tests: future-event
+  invariance, denylist unreachability, absence-vs-zero, aligned windows.
+  **Design note already settled:** `compute` must be a pure function over an
+  in-memory event list so the panel builder and the serving path share one code
+  path — that is the only reliable defence against train/serve skew, and panel
+  construction cannot afford a database round trip per snapshot (~195k snapshots).
+- T036–T045 Phase 6 model, T046–T054 Phase 7 queue, T055–T060 Phase 8 evidence,
+  T061–T074 Phase 9 agent, then API, frontend, delivery docs.
+
+**Environment quirks worth knowing**
+
+- `TZ` is set to something Postgres rejects (`unknown PostgreSQL timezone: 'ASIA0'`);
+  harmless, it falls back to UTC, but set `PGTZ=UTC` to silence it.
+- Re-running ingestion is always safe; truncate with `TRUNCATE tenant CASCADE`
+  to start clean.

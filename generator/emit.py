@@ -414,20 +414,32 @@ def emit_stripe(sim: SimResult, rng: np.random.Generator) -> list[Record]:
     out: list[Record] = []
     end = sim.outcome.at.date() if sim.outcome.at else sim.dates[-1]
 
+    # Subscription changes fire on the day they happen, not on the invoice
+    # grid. Emitting them only when a 30-day cycle happened to land on the same
+    # date silently dropped most contractions -- and contraction is half the
+    # label, so the model would have been trained on cancellations alone.
+    prev = sim.mrr_history[0][1]
+    for change_no, (change_day, new_mrr) in enumerate(sim.mrr_history[1:]):
+        if change_day > end:
+            break
+        out.append(
+            Record("stripe", f"{a.stripe_ref}-sub-{change_no}", "subscription.updated",
+                   a.stripe_ref, _dt(change_day, 6),
+                   {"subscription_ref": f"sub_{a.stripe_ref[4:]}", "mrr_cents": new_mrr,
+                    "previous_mrr_cents": prev, "plan": _plan(a.segment)})
+        )
+        prev = new_mrr
+
     mrr_changes = dict(sim.mrr_history)
     current = sim.mrr_history[0][1]
 
     d = sim.dates[0]
     seq = 0
     while d <= end:
-        if d in mrr_changes:
-            prev, current = current, mrr_changes[d]
-            out.append(
-                Record("stripe", f"{a.stripe_ref}-sub-{seq}", "subscription.updated",
-                       a.stripe_ref, _dt(d, 6),
-                       {"subscription_ref": f"sub_{a.stripe_ref[4:]}", "mrr_cents": current,
-                        "previous_mrr_cents": prev, "plan": _plan(a.segment)})
-            )
+        # Invoices bill whatever the subscription is worth on the day.
+        for cd, m in sim.mrr_history:
+            if cd <= d:
+                current = m
         idx = min((d - sim.dates[0]).days, len(sim.health) - 1)
         h = float(sim.health[idx])
 
