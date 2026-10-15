@@ -82,43 +82,43 @@ instruction.
 
 ## Phase 5: Features (blocks US1 and US2)
 
-- [ ] T028 `backend/pulse/features/denylist.py` — outcome-adjacent event types and account outcome columns
-- [ ] T029 `backend/pulse/features/windows.py` — weekday-aligned window helpers
-- [ ] T030 `backend/pulse/features/registry.py` — declarative specs per `contracts/features.md`: name, driver, window, readable types, absence rule
-- [ ] T031 `backend/pulse/features/compute.py` — `compute(tenant, account, as_of)` reading only `received_at <= as_of`, returning values + per-driver evidence ids + coverage
-- [ ] T032 [P] `tests/leakage/test_future_event_invariance.py` — insert an event after `as_of`, recompute, assert identical vector (SC-009)
-- [ ] T033 [P] `tests/leakage/test_denylist_unreachable.py` — assert feature code cannot read denylisted types or outcome columns
-- [ ] T034 [P] `tests/unit/test_absence_vs_zero.py` — no-gmail tenant yields `None`; silent customer yields `0.0`
-- [ ] T035 [P] `tests/unit/test_aligned_windows.py` — a weekend-heavy seasonal series does not produce a spurious week-over-week decline
+- [X] T028 `backend/pulse/features/denylist.py` — outcome-adjacent event types and account outcome columns
+- [X] T029 `backend/pulse/features/windows.py` — weekday-aligned window helpers
+- [X] T030 `backend/pulse/features/registry.py` — declarative specs per `contracts/features.md`: name, driver, window, readable types, absence rule
+- [X] T031 `backend/pulse/features/compute.py` — `compute(tenant, account, as_of)` reading only `received_at <= as_of`, returning values + per-driver evidence ids + coverage
+- [X] T032 [P] `tests/leakage/test_future_event_invariance.py` — insert an event after `as_of`, recompute, assert identical vector (SC-009)
+- [X] T033 [P] `tests/leakage/test_denylist_unreachable.py` — assert feature code cannot read denylisted types or outcome columns
+- [X] T034 [P] `tests/unit/test_absence_vs_zero.py` — no-gmail tenant yields `None`; silent customer yields `0.0`
+- [X] T035 [P] `tests/unit/test_aligned_windows.py` — a weekend-heavy seasonal series does not produce a spurious week-over-week decline
 
 ---
 
 ## Phase 6: Model (blocks US1 and US6)
 
-- [ ] T036 `backend/pulse/ml/labels.py` — churn-or-contraction labelling from billing corroborated by CRM, per-tenant threshold
-- [ ] T037 `backend/pulse/ml/panel.py` — weekly snapshot panel; features as-of each historical Monday, label from the following horizon
-- [ ] T038 `backend/pulse/ml/train.py` — `HistGradientBoostingClassifier`, time-based split, isotonic calibration on a held-out block, seeded
-- [ ] T039 `backend/pulse/ml/evaluate.py` — PR-AUC, ROC-AUC, Brier, reliability; **precision@capacity and captured-ACV@capacity**; trivial and heuristic baselines; per-tenant and leave-one-tenant-out; lead-time distribution; retrospective fixture check
-- [ ] T040 `backend/pulse/ml/registry.py` — versioned artefact, model card, promotion gated on beating the heuristic baseline at the operating point (FR-020)
-- [ ] T041 `backend/pulse/ml/explain.py` — TreeSHAP contributions, summed into the six drivers
-- [ ] T042 [P] `tests/leakage/test_label_permutation.py` — permuted labels collapse skill to chance (SC-010)
-- [ ] T043 [P] `tests/unit/test_train_serve_parity.py` — panel-time and serve-time vectors for the same `(account, as_of)` are identical
-- [ ] T044 [P] `tests/unit/test_promotion_gate.py` — a model that loses to the baseline is not promoted
-- [ ] T045 [P] `tests/unit/test_performance_plausibility.py` — fail the build if test AUC exceeds the plausibility ceiling (a near-perfect score means a broken harness)
+- [X] T036 `backend/pulse/ml/labels.py` — churn-or-contraction labelling from billing corroborated by CRM, per-tenant threshold
+- [X] T037 `backend/pulse/ml/panel.py` — weekly snapshot panel; features as-of each historical Monday, label from the following horizon
+- [X] T038 `backend/pulse/ml/train.py` — `HistGradientBoostingClassifier`, time-based split, isotonic calibration on a held-out block, seeded
+- [X] T039 `backend/pulse/ml/evaluate.py` — PR-AUC, ROC-AUC, Brier, reliability; **precision@capacity and captured-ACV@capacity**; trivial and heuristic baselines; per-tenant and leave-one-tenant-out; lead-time distribution; retrospective fixture check
+- [X] T040 `backend/pulse/ml/registry.py` — versioned artefact, model card, promotion gated on beating the heuristic baseline at the operating point (FR-020)
+- [X] T041 `backend/pulse/ml/explain.py` — TreeSHAP contributions, summed into the six drivers
+- [X] T042 [P] `tests/leakage/test_label_permutation.py` — permuted labels collapse skill to chance (SC-010)
+- [X] T043 [P] `tests/unit/test_train_serve_parity.py` — panel-time and serve-time vectors for the same `(account, as_of)` are identical
+- [X] T044 [P] `tests/unit/test_promotion_gate.py` — a model that loses to the baseline is not promoted
+- [X] T045 [P] `tests/unit/test_performance_plausibility.py` — fail the build if test AUC exceeds the plausibility ceiling (a near-perfect score means a broken harness)
 
 ---
 
 ## Phase 7: US1 — The Monday queue (Priority: P1) 🎯 MVP
 
-- [ ] T046 [P] [US1] `backend/pulse/domain/tiers.py` — probability → red/amber/green from tenant thresholds; 0–100 display transform
-- [ ] T047 [P] [US1] `backend/pulse/domain/confidence.py` — abstain rules with machine-readable reasons
-- [ ] T048 [P] [US1] `backend/pulse/domain/ranking.py` — `priority = p × value_at_risk × urgency`, suppression, capacity cut, below-the-cut count; emits `ranking_math`
-- [ ] T049 [P] [US1] `backend/pulse/domain/change.py` — material change: tier crossing, probability delta, dominant-driver switch
-- [ ] T050 [US1] `backend/pulse/scoring/service.py` — compute features, predict, calibrate, attribute, tier, gate confidence, rank, persist with full lineage
-- [ ] T051 [US1] `backend/pulse/api/routers/queue.py` — `GET /queue` bounded, ordered, with per-row reason, value at risk, renewal distance and delta
-- [ ] T052 [P] [US1] `tests/unit/test_ranking_math.py` — nearer renewal outranks equal probability; suppression removes; cut is respected and counted
-- [ ] T053 [P] [US1] `tests/integration/test_queue_endpoint.py` — bounded ordered queue with all required row fields
-- [ ] T054 [P] [US1] `tests/unit/test_abstain_never_green.py` — a thin-evidence account is never presented as green (SC-012)
+- [X] T046 [P] [US1] `backend/pulse/domain/tiers.py` — probability → red/amber/green from tenant thresholds; 0–100 display transform
+- [X] T047 [P] [US1] `backend/pulse/domain/confidence.py` — abstain rules with machine-readable reasons
+- [X] T048 [P] [US1] `backend/pulse/domain/ranking.py` — `priority = p × value_at_risk × urgency`, suppression, capacity cut, below-the-cut count; emits `ranking_math`
+- [X] T049 [P] [US1] `backend/pulse/domain/change.py` — material change: tier crossing, probability delta, dominant-driver switch
+- [X] T050 [US1] `backend/pulse/scoring/service.py` — compute features, predict, calibrate, attribute, tier, gate confidence, rank, persist with full lineage
+- [X] T051 [US1] `backend/pulse/api/routers/queue.py` — `GET /queue` bounded, ordered, with per-row reason, value at risk, renewal distance and delta
+- [X] T052 [P] [US1] `tests/unit/test_ranking_math.py` — nearer renewal outranks equal probability; suppression removes; cut is respected and counted
+- [X] T053 [P] [US1] `tests/integration/test_queue_endpoint.py` — bounded ordered queue with all required row fields
+- [X] T054 [P] [US1] `tests/unit/test_abstain_never_green.py` — a thin-evidence account is never presented as green (SC-012)
 
 **Checkpoint**: US1 independently demonstrable.
 
@@ -126,31 +126,31 @@ instruction.
 
 ## Phase 8: US2 — Evidence trail (Priority: P1)
 
-- [ ] T055 [US2] `backend/pulse/api/routers/accounts.py` — account detail with drivers, feature values, evidence ids
-- [ ] T056 [US2] Evidence resolution endpoint returning source records with original payloads
-- [ ] T057 [US2] `GET /accounts/{id}/score-diff` — feature-level diff between two scores with per-feature contribution change (FR-027)
-- [ ] T058 [P] [US2] `tests/integration/test_evidence_trail.py` — no score persists without resolvable evidence; contributions reconcile to model output
-- [ ] T059 [P] [US2] `tests/integration/test_score_diff.py` — a known feature movement is correctly attributed
-- [ ] T060 [P] [US2] `tests/unit/test_data_quality_attribution.py` — risk driven by a data outage is labelled as data quality, not customer behaviour
+- [X] T055 [US2] `backend/pulse/api/routers/accounts.py` — account detail with drivers, feature values, evidence ids
+- [X] T056 [US2] Evidence resolution endpoint returning source records with original payloads
+- [X] T057 [US2] `GET /accounts/{id}/score-diff` — feature-level diff between two scores with per-feature contribution change (FR-027)
+- [X] T058 [P] [US2] `tests/integration/test_evidence_trail.py` — no score persists without resolvable evidence; contributions reconcile to model output
+- [X] T059 [P] [US2] `tests/integration/test_score_diff.py` — a known feature movement is correctly attributed
+- [X] T060 [P] [US2] `tests/unit/test_data_quality_attribution.py` — risk driven by a data outage is labelled as data quality, not customer behaviour
 
 ---
 
 ## Phase 9: US3 — The autonomous cycle (Priority: P1)
 
-- [ ] T061 [US3] `backend/pulse/agent/plays.py` — play registry with eligibility by dominant driver, value tier, renewal proximity, confidence
-- [ ] T062 [US3] `backend/pulse/agent/policy.py` — allowlist, suppression window, per-tenant rate limit; every declined decision returns a reason
-- [ ] T063 [US3] `backend/pulse/agent/drafter.py` — deterministic template drafter; optional LLM behind the same interface; grounding validation rejecting unsupported claims before a human sees them
-- [ ] T064 [US3] `backend/pulse/agent/transport.py` — outbound interface with a recording implementation
-- [ ] T065 [US3] `backend/pulse/agent/cycle.py` — the stages, writing `agent_run` with stage counts and `decisions_declined`
-- [ ] T066 [US3] `backend/pulse/agent/worker.py` — tick loop, `FOR UPDATE SKIP LOCKED` lease claiming, expiry reclaim, no overlapping cycles
-- [ ] T067 [P] [US3] `tests/integration/test_worker_unattended.py` — one full cycle with zero human input advances every stage and writes a run record
-- [ ] T068 [P] [US3] `tests/integration/test_lease_recovery.py` — killed mid-unit work is reclaimed after expiry and not double-processed
-- [ ] T069 [P] [US3] `tests/integration/test_concurrent_claim.py` — two workers claim each unit exactly once
-- [ ] T070 [P] [US3] `tests/integration/test_dispatch_gate.py` — un-allowlisted play cannot self-send; withholding is recorded with its reason
-- [ ] T071 [P] [US3] `tests/integration/test_suppression_and_rate_limit.py` — repeated cycles respect both, and record each suppression
-- [ ] T072 [P] [US3] `tests/unit/test_no_llm_in_ranking.py` — module-graph assertion that no LLM module is reachable from the ranking path (FR-013)
-- [ ] T073 [P] [US3] `tests/integration/test_runs_without_llm.py` — full pipeline with LLM disabled (SC-013)
-- [ ] T074 [P] [US3] `tests/unit/test_grounding_validation.py` — an unsupported claim is rejected
+- [X] T061 [US3] `backend/pulse/agent/plays.py` — play registry with eligibility by dominant driver, value tier, renewal proximity, confidence
+- [X] T062 [US3] `backend/pulse/agent/policy.py` — allowlist, suppression window, per-tenant rate limit; every declined decision returns a reason
+- [X] T063 [US3] `backend/pulse/agent/drafter.py` — deterministic template drafter; optional LLM behind the same interface; grounding validation rejecting unsupported claims before a human sees them
+- [X] T064 [US3] `backend/pulse/agent/transport.py` — outbound interface with a recording implementation
+- [X] T065 [US3] `backend/pulse/agent/cycle.py` — the stages, writing `agent_run` with stage counts and `decisions_declined`
+- [X] T066 [US3] `backend/pulse/agent/worker.py` — tick loop, `FOR UPDATE SKIP LOCKED` lease claiming, expiry reclaim, no overlapping cycles
+- [X] T067 [P] [US3] `tests/integration/test_worker_unattended.py` — one full cycle with zero human input advances every stage and writes a run record
+- [X] T068 [P] [US3] `tests/integration/test_lease_recovery.py` — killed mid-unit work is reclaimed after expiry and not double-processed
+- [X] T069 [P] [US3] `tests/integration/test_concurrent_claim.py` — two workers claim each unit exactly once
+- [X] T070 [P] [US3] `tests/integration/test_dispatch_gate.py` — un-allowlisted play cannot self-send; withholding is recorded with its reason
+- [X] T071 [P] [US3] `tests/integration/test_suppression_and_rate_limit.py` — repeated cycles respect both, and record each suppression
+- [X] T072 [P] [US3] `tests/unit/test_no_llm_in_ranking.py` — module-graph assertion that no LLM module is reachable from the ranking path (FR-013)
+- [X] T073 [P] [US3] `tests/integration/test_runs_without_llm.py` — full pipeline with LLM disabled (SC-013)
+- [X] T074 [P] [US3] `tests/unit/test_grounding_validation.py` — an unsupported claim is rejected
 
 **Checkpoint**: US1+US2+US3 = the MVP. The brief's five non-negotiables are all demonstrable here.
 
@@ -158,9 +158,9 @@ instruction.
 
 ## Phase 10: US4 — Draft review (Priority: P2)
 
-- [ ] T075 [US4] `backend/pulse/api/routers/actions.py` — list, approve, reject, edit; actor and timestamp recorded
-- [ ] T076 [US4] Send-on-approve path through the transport, with bounded retry and surfacing on final failure
-- [ ] T077 [P] [US4] `tests/integration/test_action_lifecycle.py` — state transitions, actor recorded, no send without approval or allowlist (SC-011)
+- [X] T075 [US4] `backend/pulse/api/routers/actions.py` — list, approve, reject, edit; actor and timestamp recorded
+- [X] T076 [US4] Send-on-approve path through the transport, with bounded retry and surfacing on final failure
+- [X] T077 [P] [US4] `tests/integration/test_action_lifecycle.py` — state transitions, actor recorded, no send without approval or allowlist (SC-011)
 
 ---
 

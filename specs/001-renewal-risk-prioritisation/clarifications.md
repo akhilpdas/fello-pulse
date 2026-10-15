@@ -307,3 +307,148 @@ is drawn from it. Consequences that matter:
 
 Each pathology exists because a specific requirement claims to handle it. The
 generator is, in effect, the adversary for the ingestion and feature layers.
+
+### B-12 — "product.usage_daily" vs. the shipped adapter's "product.usage_rollup"
+
+`contracts/ingestion.md` documents the normalised product event type as
+`product.usage_daily`. The already-shipped `ProductAdapter` (Phase 4) in fact
+normalises both weekly and daily deliveries to `product.usage_rollup`, and that
+is what is actually in the database. The feature registry (`features/registry.py`)
+and `compute.py` (Phase 5) follow the real adapter output, not the stale doc
+string. Recorded here rather than silently reconciled, because the doc is wrong
+and should be corrected in a follow-up pass, not left to be rediscovered.
+
+### B-13 — What "unresolved identity" means at account granularity
+
+`cov_identity_unresolved` (contracts/features.md) is specified as a per-account
+boolean, but an `identity_link` row that failed to resolve has, by definition,
+`account_id IS NULL` — it cannot know which account it should have belonged to.
+**Adopted**: an account counts as identity-unresolved if *zero* `identity_link`
+rows resolve to it at all (`features/repository.py::identity_unresolved_for_account`).
+This catches an account that exists only because of a billing/CRM row with no
+identity mapping ever established for any of its connected sources — the
+practical case the abstain rule is trying to protect against — rather than
+attempting (impossibly) to attach an orphaned unresolved reference to a
+specific account after the fact.
+
+### B-14 — AccountFeatureInput carries only `signup_date`, not the commercial fields
+
+`ingest/dimension.py` warns explicitly against reading current account state
+(`segment`, `seats`, `acv_cents`, `renewal_date`) for a point-in-time feature,
+because the `account` table holds *today's* values. Phase 5 took that warning
+literally: `AccountFeatureInput` (`features/denylist.py`) carries only
+`signup_date` — the one commercial fact that is genuinely time-invariant.
+Every other commercial attribute (`seats`, `acv_cents`, `segment`,
+`renewal_date`) is derived inside `compute.py` from the latest
+`crm.account_updated` event with `received_at <= as_of`, the same way every
+other feature is. This is a stricter reading than the fork's original
+instructions assumed (which would have passed `seats`/`acv_cents` straight
+through from the account row) — the stricter reading is correct and is what
+shipped.
+
+### B-15 — A known, honestly reported gap: real-world model skill vs. the two retrospective fixtures (SC-006)
+
+The full pipeline was run end to end against the real ingested dataset
+(5,000 accounts, ~131k weekly panel rows, 3 tenants). Results:
+
+- ROC-AUC 0.69, PR-AUC 0.106 on the time-based test block — real, validated
+  skill (survives label permutation — SC-010 — and clears both the trivial and
+  heuristic baselines at the operating point — SC-003), but **below** the
+  "low-to-mid 0.8s" ceiling the Phase 3 generator design note anticipated.
+- The two planted retrospective fixtures (`northwind-00000`,
+  slow_support_decline, churned 2026-07-02; `northwind-00009`,
+  champion_collapse, churned 2025-08-21) were **not** flagged at any point in
+  their history by this model — max predicted probability 0.047 and 0.021
+  respectively, far below `tier_red_at` (0.32 for northwind). **SC-006 and
+  SC-005 are not currently satisfied.**
+- This was investigated, not just reported: the individual features *do* show
+  real signal for `northwind-00000` close to its churn date (`usage_active_users_wow`
+  ≈ 0.56, `usage_seat_utilisation` ≈ 0.06 on a 119-seat account — a genuine
+  usage collapse), and ticket volume stayed low because the generator's
+  "support failure" shocks degrade *response time*, not ticket *volume* — so a
+  feature set that weights volume over responsiveness will under-react to
+  exactly this fixture's story. Support response-time features
+  (`support_median_first_response_h_28d`) were present but did not dominate the
+  model's attribution for this account at the checked snapshots.
+- **Not fixed in this pass.** Hand-tuning the feature set or the model against
+  these two specific accounts would itself be a form of overfitting to the
+  fixtures rather than a genuine improvement, and the time budget for this
+  session did not allow for principled feature-engineering iteration (e.g.
+  interaction terms between response-time degradation and usage collapse,
+  or re-weighting the training objective toward the positive class) with
+  proper held-out validation that it actually generalises. Recorded as the
+  top item for the next iteration, not silently dropped.
+
+### B-16 — Play eligibility by renewal proximity: only `commercial_review` gates on it
+
+T061 asks for eligibility "by dominant driver, value tier, renewal proximity,
+confidence." Four of the five plays (`support_recovery`, `adoption_nudge`,
+`billing_resolution`, `relationship_rebuild`) have no defensible reason to
+withhold outreach based on how far away the renewal is — a customer having a
+bad support experience deserves a response whether the renewal is in 10 days
+or 300. `commercial_review` ("getting ahead of your renewal") is different:
+opening a commercial conversation a year out is premature and not what the
+play is for. `Play.max_days_to_renewal` (`agent/plays.py`) is therefore
+`None` (no gate) for four plays and `90` for `commercial_review` only — the
+mechanism is general (any future play can set this field) but only one play
+currently uses it, which is the honest reflection of which plays the brief's
+domain actually supports a proximity rule for.
+
+### B-17 — Withheld auto-send is recorded on the Action row, not in `decisions_declined`
+
+`agent_run.decisions_declined` is for accounts the cycle took *no* action on
+at all (no eligible play, human-suppressed, inside the per-account cooldown,
+an ungrounded draft, a failed send). The ordinary case — a play is drafted
+but not auto-sent because the tenant hasn't allowlisted it, or the per-cycle
+send cap is already spent — is not a decline in that sense: a draft *was*
+produced, a human will see it, nothing was silently skipped. Recording that
+reason as `Action.state_reason` (`not_allowlisted_for_auto_send` /
+`rate_limit_reached`) rather than duplicating it into every drafted
+account's run-level entry keeps `decisions_declined` meaningful (genuinely
+unusual withholdings) while still making every withholding of auto-send
+individually auditable on the row that explains it (T070).
+
+### B-18 — `work_lease` is managed through `owner_session`, not a fourth DB role
+
+`db/session.py` documented exactly three roles and their purposes (owner /
+app / trainer), none of which was "worker infrastructure." Introducing a
+fourth role for `work_lease` claiming would mean a new migration and grant
+set for a table that, per its own docstring, "is never served to a request"
+— the same invariant `owner_session` already carries for migrations and test
+fixtures. `owner_session`'s docstring was extended (one line) to cover this
+use rather than adding a role whose only justification would be organisational
+tidiness, not a real isolation boundary `work_lease` needs (it holds no
+tenant data).
+
+### B-19 — Editing a draft does not change its lifecycle state
+
+`Action` has no dedicated "last edited by/at" column, only `decided_by_user_id`
+/ `decided_at`. T075 asks for "list, approve, reject, edit; actor and
+timestamp recorded." Rather than adding schema for a fourth decision kind,
+`PATCH /actions/{id}` records the edit using the same two columns a decision
+uses (so every human touch is actor-and-timestamp-auditable) but leaves
+`state` at `drafted` — editing is revision, not a decision, and a human must
+still explicitly approve or reject afterward. Edits are only permitted while
+`state == 'drafted'`; once a decision has been made the row is immutable
+history.
+
+### B-20 — Dedicated-tenant integration tests for the agent cycle, not the real `northwind` estate
+
+Early drafts of `test_dispatch_gate.py` and `test_runs_without_llm.py` ran
+against the real ingested `northwind` tenant, the same pattern already used
+by `test_scoring_service.py`. That pattern broke here specifically: those two
+tests assert "at least one account drafts this run," which depends on
+`material_change` seeing no previous score (`previous=None` → always
+`"first_score"`). Once more than one cycle-level test runs against the same
+real tenant in a single test session, a later test inherits `score` rows an
+earlier one left behind, and whether its accounts still register as
+"materially changed" against a *different* toy model's predictions becomes
+execution-order-dependent — found by running the full suite twice and
+getting two different outcomes. Fixed by giving every cycle-level test
+(`test_dispatch_gate`, `test_suppression_and_rate_limit`,
+`test_runs_without_llm`) its own freshly created tenant via the shared
+`tests/integration/_agent_fixtures.py` helper, with deterministic ticket
+volume driving a deterministic dominant driver — `test_scoring_service.py`'s
+northwind-based tests remain fine because they assert generic properties
+(tier is one of four values, probability in `[0, 1]`) that don't depend on
+run history.
