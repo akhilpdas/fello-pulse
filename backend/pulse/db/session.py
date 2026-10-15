@@ -112,7 +112,9 @@ def elevated_session() -> Iterator[Session]:
 
 @contextmanager
 def owner_session() -> Iterator[Session]:
-    """Schema owner. Migrations and test fixtures only."""
+    """Schema owner. Migrations and test fixtures, plus worker infrastructure
+    (``work_lease``) that is schema-global and -- like migrations and
+    fixtures -- never serves a request. See ``pulse/agent/lease.py``."""
     factory = sessionmaker(bind=_engine("owner"), expire_on_commit=False, future=True)
     session = factory()
     try:
