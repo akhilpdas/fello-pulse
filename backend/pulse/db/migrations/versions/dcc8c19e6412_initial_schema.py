@@ -6,8 +6,8 @@ Create Date: 2026-10-14 19:26:02.607546+00:00
 """
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = 'dcc8c19e6412'

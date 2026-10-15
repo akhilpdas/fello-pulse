@@ -60,9 +60,8 @@ def test_interleaved_tenant_sessions_do_not_contaminate(two_tenants):
 def test_claim_is_cleared_after_a_failed_transaction(two_tenants):
     """A rollback must not leave the claim behind either."""
     a, b = two_tenants
-    with pytest.raises(Exception):
-        with tenant_session(a["tenant_id"]) as s:
-            s.execute(text("SELECT 1 FROM does_not_exist"))
+    with pytest.raises(Exception), tenant_session(a["tenant_id"]) as s:
+        s.execute(text("SELECT 1 FROM does_not_exist"))
 
     factory = sessionmaker(bind=_engine("app"), future=True)
     s2 = factory()

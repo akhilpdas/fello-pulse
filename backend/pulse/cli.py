@@ -20,14 +20,14 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-from pulse.config import SystemClock, get_settings
+from pulse.config import SystemClock
+from pulse.db.session import owner_session, tenant_session
 from pulse.ingest.dimension import refresh_accounts
 from pulse.ingest.service import (
     bootstrap_tenant,
     ingest_source,
     provision_tenant_data,
 )
-from pulse.db.session import owner_session, tenant_session
 
 
 def _tenant_dirs(feeds: Path) -> list[Path]:

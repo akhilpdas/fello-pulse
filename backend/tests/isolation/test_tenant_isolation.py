@@ -78,15 +78,14 @@ def test_cannot_write_a_row_belonging_to_another_tenant(two_tenants):
     data. Read isolation alone is only half the control.
     """
     a, b = two_tenants
-    with pytest.raises(Exception) as exc:
-        with tenant_session(a["tenant_id"]) as s:
-            s.execute(
-                text(
-                    "INSERT INTO suppression (id, tenant_id, account_id, reason, created_at)"
-                    " VALUES (gen_random_uuid(), :t, :acc, 'injected', now())"
-                ),
-                {"t": b["tenant_id"], "acc": b["account_id"]},
-            )
+    with pytest.raises(Exception) as exc, tenant_session(a["tenant_id"]) as s:
+        s.execute(
+            text(
+                "INSERT INTO suppression (id, tenant_id, account_id, reason, created_at)"
+                " VALUES (gen_random_uuid(), :t, :acc, 'injected', now())"
+            ),
+            {"t": b["tenant_id"], "acc": b["account_id"]},
+        )
     assert "policy" in str(exc.value).lower() or "violates" in str(exc.value).lower()
 
 
@@ -120,8 +119,9 @@ def test_no_claim_means_no_rows(two_tenants, scoped_tables):
     that forgets to set the claim shows up as an empty screen rather than as
     somebody else's data.
     """
-    from pulse.db.session import _engine
     from sqlalchemy.orm import sessionmaker
+
+    from pulse.db.session import _engine
 
     factory = sessionmaker(bind=_engine("app"), future=True)
     s = factory()
