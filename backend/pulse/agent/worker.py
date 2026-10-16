@@ -75,9 +75,11 @@ def run_once(
 
     try:
         with tenant_session(tenant_id) as s:
+            settings = get_settings()
             result = run_cycle(
                 s, tenant_id=tenant_id, model=model, model_version=model_version,
                 tenant_config=tenant_config, as_of=as_of, transport=transport,
+                llm_enabled=settings.llm_enabled, llm_api_key=settings.llm_api_key,
             )
         with owner_session() as lease_s:
             lease.release(lease_s, kind=LEASE_KIND, key=str(tenant_id))

@@ -529,3 +529,17 @@ the interval), which is correct but silent beyond "0/N tenants ran".
    the model has never seen gets weak ranking, and a *small* new tenant gets almost none — the shared-model
    decision (B-7) is defensible for the big tenants and not for a 500-account one. That is a finding, not a pass.
 
+### B-26 — Language-model drafting: what is guaranteed, and what is not (spec 002 US3)
+
+**Guaranteed, by test:** the model sees one JSON document of data (account name, CSM name, derived facts, allowed claims)
+and never any ticket, email or CRM free text; its reply is accepted only if every number it contains — digits *or number
+words* (`seven`, `twenty-eight`) — appears in the facts, the account name or the CSM name, it contains no link, markup or
+instruction-like text, and its claims are within the play; otherwise the template is used and the reason is recorded
+(`draft_fallback_reason`, plus `llm_calls / llm_drafted / llm_fallbacks` in the run record). Calls are capped per cycle
+(`tenant_config.llm_calls_per_cycle`) and three consecutive provider failures open a breaker. Ranking is byte-identical with the
+model off, on and failing. Edits keep the original text (`original_subject/body`).
+**Not guaranteed:** that the prose is *good*; that a fact is *relevant*; that a number-word like "one" is checked (it is ordinary prose
+and is deliberately exempt); or that a model cannot phrase something misleading using only true facts. Human review remains the control.
+**Not done:** a real provider call has never been made (scripted stand-ins only); per-tenant keys (one deployment key); prompt
+caching, streaming and retries (`max_retries=0` — a failed call becomes a template, not a delay).
+

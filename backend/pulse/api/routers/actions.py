@@ -158,7 +158,10 @@ def edit_action(
 
     session.execute(
         text(
-            "UPDATE action SET subject = COALESCE(:subj, subject), body = COALESCE(:body, body),"
+            # What the system or the model wrote is kept from the first edit and never overwritten (FR-029).
+            "UPDATE action SET original_subject = COALESCE(original_subject, subject),"
+            " original_body = COALESCE(original_body, body),"
+            " subject = COALESCE(:subj, subject), body = COALESCE(:body, body),"
             " decided_by_user_id = :u, decided_at = now() WHERE id = :i"
         ),
         {"subj": req.subject, "body": req.body, "u": principal.user_id, "i": action_id},

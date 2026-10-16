@@ -103,3 +103,23 @@ Found by thinking through how a credential could escape, then proven by a failin
 tempfail, greet 421 or accept a body and never answer. **No test, and nothing in this session, sent a real email.** A real
 inbox check is a manual step: run `python3 -m pulse.tools.smtp_sink`, or point `PULSE_SMTP_HOST` at a real provider. Bounces and
 replies are not processed, so a hard bounce is not known to the system.
+
+## 002 Phase 4 — language-model drafting (T274–T288)
+
+Mutations (backup copy, named tests, restored after; 25 green):
+
+| Mutation | Result |
+|---|---|
+| output validator accepts everything | 6+ `test_validate_llm_output` tests red (invented numbers, links, markup, instructions all got through) |
+| a provider exception propagates instead of falling back | 3 `test_llm_in_the_cycle` tests red |
+| account name placed in the instruction channel | `test_the_user_message_is_one_json_document...` red |
+
+Also pinned (guard, not test-first): importing the cycle, drafter, grounding, delivery, feature computation, training
+and scoring loads **no** LLM module until a key is configured; scoring, tiers, deltas and priority are identical with the
+model off, on and failing (`test_ranking_is_identical_with_the_model_off_on_or_failing`).
+
+**Not verified: no real call to a language-model provider has ever been made by this system.** Every test uses a scripted
+stand-in for the provider. The `AnthropicClient` adapter (about fifteen lines over the SDK) has never been run. To check live:
+`pip install -e ".[llm]"`, then `PULSE_LLM_ENABLED=true PULSE_LLM_API_KEY=… python3 -m pulse.cli cycle` and read the drafts in
+the UI (`draft_source: llm`, with the model name). A model could pass this validator and still write something awkward: the
+validator guarantees *traceability*, not good prose, which is why drafts are still reviewed by a human.

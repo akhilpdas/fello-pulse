@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -29,10 +30,12 @@ from sqlalchemy.orm import Session
 from pulse.agent.delivery import apply_outcome, deliver
 from pulse.agent.drafter import draft as draft_fn
 from pulse.agent.drafter import validate_grounding
+from pulse.agent.grounding import build_facts
 from pulse.agent.plays import eligible_plays
 from pulse.agent.policy import decide as policy_decide
 from pulse.agent.transport import Transport
 from pulse.auth import audit
+from pulse.config import get_settings
 from pulse.domain.change import material_change
 from pulse.ml.train import TrainedModel
 from pulse.scoring.service import score_and_persist
@@ -99,6 +102,28 @@ def _evidence_drivers_for_snapshot(session: Session, snapshot_id) -> set[str]:
     return {k for k, v in (evidence or {}).items() if v}
 
 
+def _feature_values(session: Session, snapshot_id) -> dict:
+    return session.execute(text("SELECT values FROM feature_snapshot WHERE id = :i"), {"i": snapshot_id}).scalar() or {}
+
+
+def _make_llm(session: Session, factory, enabled: bool, api_key):
+    """The cycle's language-model drafter, or ``None`` -- in which case every draft is a template and the
+    system behaves exactly as if the feature did not exist. ``pulse.agent.llm_drafter`` is imported only here,
+    and only when a key is configured, so the scoring path can never reach it."""
+    if factory is not None:
+        return factory()
+    if not (enabled and api_key):
+        return None
+    from pulse.agent.llm_drafter import LlmUnavailable, build_llm_drafter
+
+    key = api_key.get_secret_value() if hasattr(api_key, "get_secret_value") else str(api_key)
+    calls = session.execute(text("SELECT llm_calls_per_cycle FROM tenant_config")).scalar() or 50
+    try:
+        return build_llm_drafter(key, model=get_settings().llm_model, max_calls=calls)
+    except LlmUnavailable:
+        return None
+
+
 def run_cycle(
     session: Session,
     *,
@@ -111,7 +136,8 @@ def run_cycle(
     trigger: str = "schedule",
     csm_name: str = "Your CSM",
     llm_enabled: bool = False,
-    llm_api_key: str | None = None,
+    llm_api_key: object | None = None,
+    llm_factory: Callable[[], object] | None = None,
 ) -> CycleResult:
     run_id = uuid.uuid4()
     session.execute(
@@ -135,6 +161,7 @@ def run_cycle(
     }
     declined: list[dict] = []
     sends_this_cycle = 0
+    llm = _make_llm(session, llm_factory, llm_enabled, llm_api_key)
 
     for account_id in account_ids:
         scored = score_and_persist(
@@ -181,9 +208,10 @@ def run_cycle(
         account_name = session.execute(
             text("SELECT name FROM account WHERE id = :i"), {"i": account_id},
         ).scalar()
+        facts = build_facts(play.driver, _feature_values(session, scored.feature_snapshot_id))
         d = draft_fn(
             play.key, account_name=account_name, csm_name=csm_name,
-            llm_enabled=llm_enabled, llm_api_key=llm_api_key,
+            llm_enabled=llm_enabled, llm_api_key=None, facts=facts, llm=llm,
         )
 
         evidence_drivers = _evidence_drivers_for_snapshot(session, scored.feature_snapshot_id)
@@ -199,14 +227,16 @@ def run_cycle(
         session.execute(
             text(
                 "INSERT INTO action (id, tenant_id, account_id, score_id, agent_run_id, play_key,"
-                " state, state_reason, channel, subject, body, draft_source, grounding, created_at)"
-                " VALUES (:i, :t, :a, :s, :r, :pk, 'drafted', :sr, :ch, :subj, :body, :ds, CAST(:g AS jsonb), now())"
+                " state, state_reason, channel, subject, body, draft_source, draft_model, draft_fallback_reason,"
+                " grounding, created_at)"
+                " VALUES (:i, :t, :a, :s, :r, :pk, 'drafted', :sr, :ch, :subj, :body, :ds, :dm, :dfr,"
+                " CAST(:g AS jsonb), now())"
             ),
             {
                 "i": action_id, "t": tenant_id, "a": account_id, "s": scored.score_id,
                 "r": run_id, "pk": play.key, "sr": policy.reason, "ch": play.channel,
-                "subj": d.subject, "body": d.body, "ds": d.draft_source,
-                "g": json.dumps({"evidence_drivers": sorted(evidence_drivers)}),
+                "subj": d.subject, "body": d.body, "ds": d.draft_source, "dm": d.model, "dfr": d.fallback_reason,
+                "g": json.dumps({"evidence_drivers": sorted(evidence_drivers), "facts": facts}),
             },
         )
         stage_counts["drafted"] += 1
@@ -239,6 +269,11 @@ def run_cycle(
         ),
         {"sc": json.dumps(stage_counts), "dd": json.dumps(declined), "i": run_id},
     )
+
+    if llm is not None:  # how the model did, in the run record: a degraded provider must be visible, not silent
+        stage_counts.update(llm_calls=llm.calls, llm_drafted=llm.drafted, llm_fallbacks=llm.fallbacks)
+        session.execute(text("UPDATE agent_run SET stage_counts = CAST(:sc AS jsonb) WHERE id = :i"),
+                        {"sc": json.dumps(stage_counts), "i": run_id})
 
     # The worker acts as the system, never as a person (FR-010): the cycle is attributed accordingly.
     audit.record(session, "cycle_run", actor_kind="system", subject=str(run_id), detail=stage_counts)

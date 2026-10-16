@@ -125,21 +125,21 @@ is labelled so, never presented as test-first. Run the **full** suite (`python3 
 
 **Goal**: real model prose, grounded, with a deterministic fallback; ranking untouched.
 
-- [ ] T274 [P] [US3] RED `backend/tests/unit/test_grounding_facts.py` — `build_facts(score)` yields short deterministic strings from the account's top drivers (e.g. "3 support tickets in the last 28 days"); contains **no** raw ticket/email text. Fails: grounding holds driver names only. (FR-024, FR-030)
-- [ ] T275 [US3] GREEN `backend/pulse/agent/grounding.py` + `cycle.py` stores `facts` in `action.grounding`. (FR-024)
-- [ ] T276 [P] [US3] RED `backend/tests/unit/test_validate_llm_output.py` — rejects an unseen number, date or percentage, any URL or markup, instruction-like text, over-length, and `claims` outside the evidence; accepts a grounded draft; each rejection returns a reason. Fails: function missing. (FR-026, SC-010)
-- [ ] T277 [US3] GREEN `backend/pulse/agent/drafter.py::validate_llm_output` (pure). (FR-026)
-- [ ] T278 [P] [US3] RED `backend/tests/unit/test_llm_prompt_isolation.py` — with a scripted client, the prompt contains the facts and constraints and **not** ticket text containing "ignore previous instructions" (prompt-injection guard); output parsed as `{subject,body,claims}`. Fails: no client. (FR-030)
-- [ ] T279 [US3] GREEN `backend/pulse/agent/llm_drafter.py::draft_with_llm(client=…)` — lazy `anthropic` import, injected client for tests, `pyproject` extra `llm`. (FR-024, R-13)
-- [ ] T280 [P] [US3] RED `backend/tests/integration/test_llm_fallback.py` — no key, disabled, provider error, timeout, empty reply, bad JSON, invalid key/over quota, and a validation failure each yield the template draft; `draft_fallback_reason` recorded; the cycle completes; the run record counts fallbacks. Fails: `draft_with_llm` raises today. (FR-027, SC-011)
-- [ ] T281 [US3] GREEN fallback + provenance (`draft_source`, `draft_model`, `draft_fallback_reason`) in `agent/cycle.py`. (FR-027, FR-029)
-- [ ] T282 [P] [US3] RED `backend/tests/integration/test_llm_bounds.py` — with a slow/failing stand-in the cycle makes ≤ `llm_calls_per_cycle` calls, opens a breaker after consecutive failures, serves the rest from templates, and still finishes inside a bound. Fails: unbounded. (FR-028, SC-011)
-- [ ] T283 [US3] GREEN per-cycle cap, per-call timeout, breaker. (FR-028)
-- [ ] T284 [US3] RED `backend/tests/integration/test_ranking_invariant_to_llm.py` — same data scored with the model off, on, and failing: scores, tiers, deltas and queue order byte-identical for every account. (SC-009, FR-025, Principle II). GUARD if it passes immediately.
-- [ ] T285 [P] [US3] GUARD extend `backend/tests/unit/test_no_llm_in_ranking.py` to cover the new modules (`grounding`, `llm_drafter`) — neither is importable from `features/`, `scoring/`, `ml/`, `domain/ranking`. (FR-025)
-- [ ] T286 [P] [US3] RED `backend/tests/integration/test_edit_keeps_original.py` — editing a model-written draft stores the original once and the edited text; sending uses the edit. Fails: original overwritten. (FR-029)
-- [ ] T287 [US3] GREEN `routers/actions.py::edit`. (FR-029)
-- [ ] T288 [US3] Document the manual live check (needs a key) in `quickstart.md`; no automated test calls a real provider. (Assumptions)
+- [x] T274 [P] [US3] RED `backend/tests/unit/test_grounding_facts.py` — `build_facts(score)` yields short deterministic strings from the account's top drivers (e.g. "3 support tickets in the last 28 days"); contains **no** raw ticket/email text. Fails: grounding holds driver names only. (FR-024, FR-030)
+- [x] T275 [US3] GREEN `backend/pulse/agent/grounding.py` + `cycle.py` stores `facts` in `action.grounding`. (FR-024)
+- [x] T276 [P] [US3] RED `backend/tests/unit/test_validate_llm_output.py` — rejects an unseen number, date or percentage, any URL or markup, instruction-like text, over-length, and `claims` outside the evidence; accepts a grounded draft; each rejection returns a reason. Fails: function missing. (FR-026, SC-010)
+- [x] T277 [US3] GREEN `backend/pulse/agent/drafter.py::validate_llm_output` (pure). (FR-026)
+- [x] T278 [P] [US3] RED `backend/tests/unit/test_llm_prompt_isolation.py` — with a scripted client, the prompt contains the facts and constraints and **not** ticket text containing "ignore previous instructions" (prompt-injection guard); output parsed as `{subject,body,claims}`. Fails: no client. (FR-030)
+- [x] T279 [US3] GREEN `backend/pulse/agent/llm_drafter.py::draft_with_llm(client=…)` — lazy `anthropic` import, injected client for tests, `pyproject` extra `llm`. (FR-024, R-13)
+- [x] T280 [P] [US3] RED `backend/tests/integration/test_llm_fallback.py` — no key, disabled, provider error, timeout, empty reply, bad JSON, invalid key/over quota, and a validation failure each yield the template draft; `draft_fallback_reason` recorded; the cycle completes; the run record counts fallbacks. Fails: `draft_with_llm` raises today. (FR-027, SC-011)
+- [x] T281 [US3] GREEN fallback + provenance (`draft_source`, `draft_model`, `draft_fallback_reason`) in `agent/cycle.py`. (FR-027, FR-029)
+- [x] T282 [P] [US3] RED `backend/tests/integration/test_llm_bounds.py` — with a slow/failing stand-in the cycle makes ≤ `llm_calls_per_cycle` calls, opens a breaker after consecutive failures, serves the rest from templates, and still finishes inside a bound. Fails: unbounded. (FR-028, SC-011)
+- [x] T283 [US3] GREEN per-cycle cap, per-call timeout, breaker. (FR-028)
+- [x] T284 [US3] RED `backend/tests/integration/test_ranking_invariant_to_llm.py` — same data scored with the model off, on, and failing: scores, tiers, deltas and queue order byte-identical for every account. (SC-009, FR-025, Principle II). GUARD if it passes immediately.
+- [x] T285 [P] [US3] GUARD extend `backend/tests/unit/test_no_llm_in_ranking.py` to cover the new modules (`grounding`, `llm_drafter`) — neither is importable from `features/`, `scoring/`, `ml/`, `domain/ranking`. (FR-025)
+- [x] T286 [P] [US3] RED `backend/tests/integration/test_edit_keeps_original.py` — editing a model-written draft stores the original once and the edited text; sending uses the edit. Fails: original overwritten. (FR-029)
+- [x] T287 [US3] GREEN `routers/actions.py::edit`. (FR-029)
+- [x] T288 [US3] Document the manual live check (needs a key) in `quickstart.md`; no automated test calls a real provider. (Assumptions)
 
 ## Phase 5 — US4: one command runs it in containers (P4) — UNVERIFIED here
 
