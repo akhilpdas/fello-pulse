@@ -5,6 +5,9 @@ accounts where their attention changes the outcome, the evidence behind the rank
 and a drafted first move. It runs on its own: ingest → score → detect change → draft →
 record, with nothing gated on a person opening a page.
 
+**Presenting or reviewing this? Start with [`docs/DEMO_GUIDE.md`](docs/DEMO_GUIDE.md)** — how to start it, the sign-in for every workspace and how the password is set, a six-minute guided tour,
+which language model is used (and that it only writes), and exactly what is real versus a stand-in.
+
 Run it in VS Code: `Terminal ▸ Run Task…` → the numbered `Pulse:` tasks (details in the quickstart).
 Sign in with a workspace + email + password (task **show demo sign-ins**); CSMs see only their own accounts, operators the whole tenant — identity comes from a verified session, never from a header. Task **4** starts the unattended worker (`python3 -m pulse.cli serve`): a loop that cycles each tenant when
 it is due, leased so two workers can't double-run a tenant, recording a `failed` run (and carrying on with
