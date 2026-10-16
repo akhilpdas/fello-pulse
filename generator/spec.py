@@ -160,6 +160,10 @@ class AccountSpec:
     stripe_ref: str = ""
     gmail_domain: str = ""
     product_ref: str = ""
+    # Primary customer contact as the CRM holds it. Empty = the CRM has none (~10% of accounts), which
+    # the application must treat as "do not send", never as a reason to invent an address.
+    contact_name: str = ""
+    contact_email: str = ""
 
 
 @dataclass

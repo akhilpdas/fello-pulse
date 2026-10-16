@@ -526,3 +526,29 @@ validation, container files (unverified — Docker is not installed), re-quoting
 "skipped" split, re-run `/speckit-analyze`. **Not verified:** the new sign-in screen and account-action buttons have not been driven in
 a browser; there is no operator UI (user/audit/outbound management is API only); login rate limiting is per-process.
 Nothing from this session is committed.
+
+
+---
+
+## Status as of 2026-10-16 (spec 002 — Phase 3 / US2, real email, complete)
+
+Backend **371 passed**, frontend **29 passed**, build clean. Tasks T249–T273 done (see `specs/002-production-readiness/tasks.md`).
+
+- **Data:** the simulated CRM now carries a primary customer contact per account (~90%; the rest realistically none). Derived
+  from a hash of the account reference, **not** the main random stream — so all 349,870 existing records are byte-identical
+  (fingerprint checked before and after) and no earlier metric moves. Ingestion stores the latest CRM contact on the account.
+- **Delivery:** `SmtpTransport` (stdlib), a pure send gate (`domain/send_gate.py`), and one shared `agent/delivery.py` used by both a
+  human approval and the unattended cycle. Safe by default: nothing sends unless the tenant has outbound on, a verified sender,
+  a provider, a known contact and no opt-out; each failure is its own state with zero network traffic. **Demo mode is the default**:
+  mail goes only to a test inbox, or is captured without any delivery. Approve is atomic and idempotent; an *ambiguous* outcome
+  becomes `send_unconfirmed` and is never auto-retried.
+- **Found and fixed on the way:** the unattended cycle was calling the transport directly with a placeholder address and no
+  gate (now routed through the same delivery code); SMTP misconfiguration was retried as "transient" (now permanent).
+- **Operator controls (API only):** `GET/PATCH /admin/outbound` (cannot enable without a verified sender; changing the sender
+  revokes verification), `/admin/opt-outs`, opt-out footer on every message, audit events.
+- **UI:** the Drafts page explains each state in plain words and allows re-approval only where the message definitely did not leave.
+- **Mutation-verified (3):** gate bypass, demo-mode bypass, retry-on-ambiguous — each caught (docs/VERIFICATION.md).
+
+**Not verified:** no real email has ever been sent by this system — only to an in-process fake SMTP server. Bounces, replies
+and complaints are not processed. The operator pages (outbound settings, opt-outs, users, audit) exist only as API routes. The
+demo database has not been rebuilt, so it does not yet contain customer contacts (rebuild with the "RESET" then "build demo data" tasks).

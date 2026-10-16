@@ -53,7 +53,11 @@ def refresh_accounts(session: Session, tenant_id: uuid.UUID) -> dict:
               seats         = NULLIF(l.payload->>'seats','')::int,
               acv_cents     = NULLIF(l.payload->>'acv_cents','')::bigint,
               renewal_date  = NULLIF(l.payload->>'renewal_date','')::date,
-              signup_date   = f.signup::date
+              signup_date   = f.signup::date,
+              -- Latest CRM state wins, including 'no contact': a person removed in the CRM must not
+              -- linger here as an address we keep writing to. Never a placeholder (FR-015).
+              contact_name  = NULLIF(l.payload->'primary_contact'->>'name', ''),
+              contact_email = lower(NULLIF(l.payload->'primary_contact'->>'email', ''))
             FROM latest l JOIN first_seen f ON f.account_id = l.account_id
             WHERE a.id = l.account_id
             """

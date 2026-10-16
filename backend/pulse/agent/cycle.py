@@ -26,6 +26,7 @@ from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from pulse.agent.delivery import apply_outcome, deliver
 from pulse.agent.drafter import draft as draft_fn
 from pulse.agent.drafter import validate_grounding
 from pulse.agent.plays import eligible_plays
@@ -192,49 +193,42 @@ def run_cycle(
             stage_counts["declined"] += 1
             continue
 
-        state = "drafted"
-        sent_at = None
-        attempts = 0
-        # Every withholding of auto-send carries its reason onto the Action
-        # row itself (T070) -- "not_allowlisted_for_auto_send" is the normal,
-        # safe default and is not a run-level decline; a failed send attempt
-        # is both (declined at the run level, and visible on the row for
-        # T076's retry/surfacing path).
-        state_reason = policy.reason
-        if policy.allow_auto_send:
-            attempts = 1
-            result = transport.send(to=f"csm+{account_id}@example.test", subject=d.subject, body=d.body)
-            if result.ok:
-                state = "sent"
-                sent_at = as_of
-                sends_this_cycle += 1
-                state_reason = None
-            else:
-                state_reason = f"send_failed:{result.error}"
-                declined.append({
-                    "account_id": str(account_id), "play": play.key, "reason": state_reason,
-                })
-
+        # Every withholding of auto-send carries its reason onto the Action row itself (T070) --
+        # "not_allowlisted_for_auto_send" is the normal, safe default and is not a run-level decline.
         action_id = uuid.uuid4()
         session.execute(
             text(
                 "INSERT INTO action (id, tenant_id, account_id, score_id, agent_run_id, play_key,"
-                " state, state_reason, channel, subject, body, draft_source, grounding, created_at,"
-                " sent_at, attempts)"
-                " VALUES (:i, :t, :a, :s, :r, :pk, :st, :sr, :ch, :subj, :body, :ds, CAST(:g AS jsonb),"
-                " now(), :sa, :att)"
+                " state, state_reason, channel, subject, body, draft_source, grounding, created_at)"
+                " VALUES (:i, :t, :a, :s, :r, :pk, 'drafted', :sr, :ch, :subj, :body, :ds, CAST(:g AS jsonb), now())"
             ),
             {
                 "i": action_id, "t": tenant_id, "a": account_id, "s": scored.score_id,
-                "r": run_id, "pk": play.key, "st": state, "sr": state_reason, "ch": play.channel,
+                "r": run_id, "pk": play.key, "sr": policy.reason, "ch": play.channel,
                 "subj": d.subject, "body": d.body, "ds": d.draft_source,
                 "g": json.dumps({"evidence_drivers": sorted(evidence_drivers)}),
-                "sa": sent_at, "att": attempts,
             },
         )
         stage_counts["drafted"] += 1
-        if state == "sent":
-            stage_counts["sent"] += 1
+
+        if policy.allow_auto_send:
+            # The same delivery path a human approval takes (send gate, demo mode, classified outcome):
+            # the unattended cycle gets no looser a boundary than a person (constitution III, FR-019).
+            outcome = deliver(
+                session, action_id=action_id, account_id=account_id, subject=d.subject, body=d.body,
+                transport=transport,
+            )
+            apply_outcome(session, action_id, outcome)
+            if outcome.sent:
+                sends_this_cycle += 1
+                stage_counts["sent"] += 1
+            else:
+                declined.append({
+                    "account_id": str(account_id), "play": play.key,
+                    "reason": f"send_blocked:{outcome.state}:{outcome.state_reason}"
+                    if outcome.state not in ("send_failed", "send_unconfirmed")
+                    else f"{outcome.state}:{outcome.state_reason}",
+                })
 
     session.execute(
         text(

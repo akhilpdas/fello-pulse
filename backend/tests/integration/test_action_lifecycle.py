@@ -34,7 +34,10 @@ def _seed_minimal_action(state: str = "drafted") -> tuple[uuid.UUID, uuid.UUID]:
     with owner_session() as s:
         s.execute(text("INSERT INTO tenant (id, slug, name, created_at) VALUES (:i,:s,:n, now())"),
                   {"i": tenant_id, "s": slug, "n": slug})
-        s.execute(text("INSERT INTO tenant_config (id, tenant_id) VALUES (:i,:t)"),
+        # A demo-mode tenant with a verified sender and a test inbox: delivery goes through the same gate and
+        # code path as a real tenant, to a harmless address (see test_approve_delivers.py for real SMTP).
+        s.execute(text("INSERT INTO tenant_config (id, tenant_id, outbound_enabled, sender_address, sender_verified,"
+                       " demo_mode, test_inbox) VALUES (:i,:t, true, 'csm@example.test', true, true, 'demo@example.test')"),
                   {"i": uuid.uuid4(), "t": tenant_id})
         s.execute(
             text("INSERT INTO app_user (id, tenant_id, email, name, role) VALUES (:i,:t,:e,:n,'csm')"),
@@ -43,7 +46,8 @@ def _seed_minimal_action(state: str = "drafted") -> tuple[uuid.UUID, uuid.UUID]:
         s.execute(
             text(
                 "INSERT INTO account (id, tenant_id, external_ref, name, signup_date,"
-                " lifecycle_state, owner_user_id, created_at) VALUES (:i,:t,:r,:n,:sd,'active', :u, now())"
+                " lifecycle_state, owner_user_id, contact_email, created_at)"
+                " VALUES (:i,:t,:r,:n,:sd,'active', :u, 'contact@acme.example.test', now())"
             ),
             {"i": account_id, "t": tenant_id, "r": "acct-1", "n": "Acme",
              "sd": AS_OF.date(), "u": user_id},  # Dana owns the account she acts on

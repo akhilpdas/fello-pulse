@@ -115,7 +115,7 @@ def cmd_status(args) -> int:
 def cmd_cycle(args) -> int:
     """One autonomous cycle for every ingested tenant, as of ``--as-of`` (default:
     the newest event received). Thin wrapper over agent.worker.tick -- no decisions here."""
-    from pulse.agent.transport import RecordingTransport
+    from pulse.agent.transport import select_transport
     from pulse.agent.worker import build_runtime, tick
     from pulse.config import FrozenClock, get_settings
     from pulse.db.session import elevated_session
@@ -128,7 +128,7 @@ def cmd_cycle(args) -> int:
     with owner_session() as s:
         as_of = (datetime.fromisoformat(args.as_of) if args.as_of
                  else s.execute(text("SELECT max(received_at) FROM source_event")).scalar())
-    runtimes = [build_runtime(tid, model=model, model_version=version, transport=RecordingTransport())
+    runtimes = [build_runtime(tid, model=model, model_version=version, transport=select_transport(get_settings()))
                 for tid, _ in tenants]
     settings = get_settings()
     t0 = time.time()
@@ -145,7 +145,7 @@ def cmd_serve(args) -> int:
     """The unattended worker: tick every few seconds, cycle each tenant when it is due.
     ``--simulate-present`` runs on the data's present (its newest event) and lets it advance in
     real time -- the demo data is dated later than the wall clock. Thin wrapper over worker.serve."""
-    from pulse.agent.transport import RecordingTransport
+    from pulse.agent.transport import select_transport
     from pulse.agent.worker import build_runtime, serve
     from pulse.config import OffsetClock, SystemClock, get_settings
     from pulse.db.session import elevated_session
@@ -155,7 +155,7 @@ def cmd_serve(args) -> int:
     model, version = load_promoted_model(Path(args.artifacts))
     with elevated_session() as s:
         tenants = trainable_tenants(s)
-    runtimes = [build_runtime(tid, model=model, model_version=version, transport=RecordingTransport())
+    runtimes = [build_runtime(tid, model=model, model_version=version, transport=select_transport(get_settings()))
                 for tid, _ in tenants]
     clock = SystemClock()
     if args.simulate_present:

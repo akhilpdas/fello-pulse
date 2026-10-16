@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Status } from "../components/Status";
 import type { Action } from "../api/types";
+import { canApprove, describeState } from "../lib/actionState";
 import { driverLabel } from "../lib/format";
 import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
@@ -12,6 +13,7 @@ function Draft({ a, onChanged }: { a: Action; onChanged: () => void }) {
   const [subject, setSubject] = useState(a.subject ?? "");
   const [err, setErr] = useState<string | null>(null);
   const editable = a.state === "drafted";
+  const meaning = describeState(a);
 
   async function run(fn: () => Promise<unknown>) {
     setErr(null);
@@ -20,7 +22,7 @@ function Draft({ a, onChanged }: { a: Action; onChanged: () => void }) {
   return (
     <article className="draft">
       <header><strong>{a.play_key}</strong> <span className={`state state-${a.state}`}>{a.state}</span>
-        {a.state_reason && <span className="muted"> — {a.state_reason}</span>}
+        <p className={`state-note tone-${meaning.tone}`} role="status">{meaning.text}</p>
         {" "}<Link to={`/accounts/${a.account_id}`}>account</Link></header>
       <div className="draft-grid">
         <div>
@@ -35,11 +37,11 @@ function Draft({ a, onChanged }: { a: Action; onChanged: () => void }) {
           <p className="muted">Drafted by {a.draft_source}. <Link to={`/accounts/${a.account_id}`}>See the evidence</Link></p>
         </aside>
       </div>
-      {editable && (
+      {(editable || canApprove(a.state)) && (
         <footer>
-          <button onClick={() => run(() => api.patch(`/actions/${a.id}`, { subject, body }))}>Save edit</button>{" "}
+          {editable && <button onClick={() => run(() => api.patch(`/actions/${a.id}`, { subject, body }))}>Save edit</button>}{" "}
           <button onClick={() => run(() => api.post(`/actions/${a.id}/approve`, {}))}>Approve & send</button>{" "}
-          <button onClick={() => run(() => api.post(`/actions/${a.id}/reject`, {}))}>Reject</button>
+          {editable && <button onClick={() => run(() => api.post(`/actions/${a.id}/reject`, {}))}>Reject</button>}
         </footer>
       )}
       {err && <p className="error" role="alert">{err}</p>}
@@ -55,7 +57,7 @@ export function DraftsPage() {
       <h1>Draft review</h1>
       <label>Show{" "}
         <select value={state} onChange={(e) => setState(e.target.value)}>
-          {["drafted", "sent", "send_failed", "rejected"].map((s) => <option key={s}>{s}</option>)}
+          {["drafted", "sent", "send_unconfirmed", "send_failed", "outbound_disabled", "not_configured", "no_recipient", "opted_out", "rejected"].map((s) => <option key={s}>{s}</option>)}
         </select>
       </label>
       <Status loading={loading} error={error} empty={data && !data.rows.length && `No ${state} actions.`} />

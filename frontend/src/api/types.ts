@@ -38,6 +38,9 @@ export interface Action {
   channel: string; subject: string | null; body: string; draft_source: string; created_at: string;
   decided_at: string | null; decided_by_user_id: string | null; sent_at: string | null;
   attempts: number; grounding: { evidence_drivers?: string[] } | null;
+  redirected_to: string | null; provider_message_id: string | null; delivery_error: string | null;
+  draft_model: string | null; draft_fallback_reason: string | null;
+  original_subject: string | null; original_body: string | null;
 }
 export interface Run {
   id: string; trigger: string; status: string; started_at: string; finished_at: string | null;

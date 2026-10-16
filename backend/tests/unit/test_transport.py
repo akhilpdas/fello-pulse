@@ -10,7 +10,7 @@ def test_send_records_the_message_and_reports_ok():
     t = RecordingTransport()
     result = t.send(to="csm@example.test", subject="Hi", body="body")
     assert result.ok is True
-    assert t.sent == [{"to": "csm@example.test", "subject": "Hi", "body": "body"}]
+    assert t.sent == [{"to": "csm@example.test", "subject": "Hi", "body": "body", "sender": None, "message_id": None}]
 
 
 def test_fail_next_simulates_a_bounded_number_of_failures():

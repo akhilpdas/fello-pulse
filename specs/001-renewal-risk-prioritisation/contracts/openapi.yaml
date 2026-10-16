@@ -241,6 +241,14 @@ paths:
   /actions/{action_id}/approve:
     post:
       summary: Approve Action
+      description: 'Approve a draft and deliver it -- once. The claim below is a single
+        conditional UPDATE, so of two
+
+        simultaneous approvals exactly one wins and sends; the other returns the winner''s
+        result. States in
+
+        which the message may already have left (sent, send_unconfirmed) are never
+        claimed again.'
       operationId: approve_action_actions__action_id__approve_post
       parameters:
       - name: action_id
@@ -415,6 +423,92 @@ paths:
           content:
             application/json:
               schema: {}
+  /admin/outbound:
+    get:
+      summary: Get Outbound
+      operationId: get_outbound_admin_outbound_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+    patch:
+      summary: Patch Outbound
+      operationId: patch_outbound_admin_outbound_patch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutboundPatch'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/opt-outs:
+    get:
+      summary: List Opt Outs
+      operationId: list_opt_outs_admin_opt_outs_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+    post:
+      summary: Add Opt Out
+      operationId: add_opt_out_admin_opt_outs_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OptOutCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/opt-outs/{opt_out_id}:
+    delete:
+      summary: Remove Opt Out
+      operationId: remove_opt_out_admin_opt_outs__opt_out_id__delete
+      parameters:
+      - name: opt_out_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Opt Out Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /model:
     get:
       summary: Get Model Report
@@ -767,6 +861,51 @@ components:
       - email
       - password
       title: LoginRequest
+    OptOutCreate:
+      properties:
+        email:
+          type: string
+          title: Email
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      title: OptOutCreate
+    OutboundPatch:
+      properties:
+        outbound_enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Outbound Enabled
+        sender_address:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sender Address
+        sender_verified:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Sender Verified
+        demo_mode:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Demo Mode
+        test_inbox:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Test Inbox
+      additionalProperties: false
+      type: object
+      title: OutboundPatch
     OwnerPatch:
       properties:
         owner_user_id:

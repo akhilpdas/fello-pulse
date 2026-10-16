@@ -523,6 +523,8 @@ def emit_salesforce(sim: SimResult, rng: np.random.Generator) -> list[Record]:
                     "acv_cents": a.acv_cents if rng.random() > 0.07 else None,
                     "renewal_date": renewal.isoformat(),
                     "owner_ref": owner,
+                    "primary_contact": ({"name": a.contact_name, "email": a.contact_email}
+                                        if a.contact_email else None),
                     "plan": _plan(a.segment)})
         )
         seq += 1

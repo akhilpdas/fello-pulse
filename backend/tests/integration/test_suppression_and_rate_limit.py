@@ -110,6 +110,13 @@ def _seed_tenant():
             ),
             {"i": uuid.uuid4(), "t": tenant_id, "a": suppressed_id, "x": AS_OF + timedelta(days=365)},
         )
+        # Deliverable tenant: verified sender, demo mode with a test inbox, a contact per account. The rate limit
+        # is the thing under test, so nothing else may block these sends.
+        s.execute(text("UPDATE tenant_config SET outbound_enabled = true, sender_address = 'csm@example.test',"
+                       " sender_verified = true, demo_mode = true, test_inbox = 'demo@example.test'"
+                       " WHERE tenant_id = :t"), {"t": tenant_id})
+        s.execute(text("UPDATE account SET contact_email = external_ref || '@acme.example.test' WHERE tenant_id = :t"),
+                  {"t": tenant_id})
         s.execute(
             text(
                 "INSERT INTO play_allowlist (id, tenant_id, play_key, auto_send, enabled_at)"

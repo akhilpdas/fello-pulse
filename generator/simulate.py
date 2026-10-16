@@ -33,6 +33,7 @@ and ``tests/unit/test_performance_plausibility.py`` fails the build if it happen
 
 from __future__ import annotations
 
+import hashlib
 import math
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
@@ -154,9 +155,32 @@ def build_accounts(tenant: TenantSpec, rng: np.random.Generator) -> list[Account
                 stripe_ref=f"cus_{''.join(rng.choice(list('abcdefghijklmnopqrstuvwxyz0123456789'), 14))}",
                 gmail_domain=f"{ref.replace('-', '')}.example.com",
                 product_ref=f"pw_{rng.integers(10**7, 10**8 - 1)}",
+                **_contact(ref),
             )
         )
     return accounts
+
+
+_FIRST = ["Alex", "Maria", "Chen", "Priya", "Tom", "Aisha", "Luca", "Hana", "Omar", "Sofia", "Ravi",
+          "Elena", "Kofi", "Mei", "Jonas", "Amara", "Diego", "Ingrid", "Yusuf", "Nora"]
+_LAST = ["Nguyen", "Okafor", "Rossi", "Patel", "Kim", "Silva", "Muller", "Haddad", "Ivanov", "Santos",
+         "Larsen", "Abara", "Tanaka", "Costa", "Novak", "Reyes", "Berg", "Kaya", "Dubois", "Singh"]
+
+
+def _contact(ref: str) -> dict:
+    """The account's primary contact, derived from its reference alone.
+
+    Deliberately *not* drawn from the estate's main random stream: adding a field must not shift one
+    random number that decides an event, a lag or an outcome, or every downstream metric changes for
+    reasons unrelated to the change. A hash-seeded stream per account keeps the rest of the estate
+    byte-identical and the contact stable for the same account across runs.
+    """
+    r = np.random.default_rng(int.from_bytes(hashlib.sha256(f"contact:{ref}".encode()).digest()[:8], "big"))
+    if r.random() >= 0.9:
+        return {"contact_name": "", "contact_email": ""}
+    first, last = str(r.choice(_FIRST)), str(r.choice(_LAST))
+    return {"contact_name": f"{first} {last}",
+            "contact_email": f"{first}.{last}@{ref.replace('-', '')}.example.com".lower()}
 
 
 def simulate_account(

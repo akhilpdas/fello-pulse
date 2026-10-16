@@ -85,3 +85,21 @@ queue 12 rows (78 below the cut — their own accounts only); CSM on `/admin/con
 `X-Requested-With` → 403.
 
 Not verified: the browser login form (no browser run); the per-process login limiter across multiple API instances.
+
+## 002 Phase 3 — email (T273)
+
+Each safety rule was broken on a backup copy and the named tests run; originals restored after (47 green).
+
+| Mutation | Result |
+|---|---|
+| send gate allows everything (switched-off tenant, opted-out contact) | 6 tests red across `test_approve_delivers`, `test_send_gate` |
+| demo mode ignored (deliver to the real contact) | 4 tests red incl. `test_in_demo_mode_nothing_reaches_a_real_contact_across_a_whole_cycle` |
+| an ambiguous outcome is retried | 2 tests red: `test_an_ambiguous_outcome_is_never_retried...`, `test_an_ambiguous_outcome_is_send_unconfirmed...` |
+
+Found by thinking through how a credential could escape, then proven by a failing test: `smtplib.SMTPException` subclasses
+`OSError`, so credentials offered to a server with no AUTH were classified *transient* and retried three times; now permanent.
+
+**What "delivered" means here — and does not.** Delivery is exercised against an in-process fake SMTP server that can reject,
+tempfail, greet 421 or accept a body and never answer. **No test, and nothing in this session, sent a real email.** A real
+inbox check is a manual step: run `python3 -m pulse.tools.smtp_sink`, or point `PULSE_SMTP_HOST` at a real provider. Bounces and
+replies are not processed, so a hard bounce is not known to the system.

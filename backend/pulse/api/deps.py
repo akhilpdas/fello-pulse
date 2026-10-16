@@ -12,11 +12,11 @@ from pathlib import Path
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from pulse.agent.transport import RecordingTransport, Transport
+from pulse.agent.transport import Transport, select_transport
 from pulse.auth import audit
 from pulse.auth.principal import Principal
 from pulse.auth.sessions import resolve_session
-from pulse.config import Clock, SystemClock
+from pulse.config import Clock, SystemClock, get_settings
 from pulse.db.session import tenant_session
 
 SESSION_COOKIE = "pulse_session"
@@ -91,13 +91,9 @@ def get_session(principal: Principal = Depends(get_principal)) -> Iterator[Sessi
         yield s
 
 
-# Production would override this with a real email-provider-backed
-# Transport; this deliverable's default is the recording stub -- never a
-# real network call, consistent with running fully functional with no
-# external services configured (constitution Principle II's same posture,
-# applied to outbound dispatch rather than drafting).
 def get_transport() -> Transport:
-    return RecordingTransport()
+    """The deployment's mail transport (see ``select_transport``). Tests override this."""
+    return select_transport(get_settings())
 
 
 def get_artifacts_dir() -> Path:

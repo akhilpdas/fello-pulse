@@ -6,15 +6,18 @@ the operator who did it (constitution Principle III).
 
 from __future__ import annotations
 
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from pulse.agent.plays import PLAYS
 from pulse.api.deps import get_session, require_operator
+from pulse.auth import audit
+from pulse.config import get_settings
 
 router = APIRouter(prefix="/admin")
 
@@ -128,3 +131,118 @@ def get_coverage(_: uuid.UUID = Depends(require_operator), session: Session = De
             "last_received_at": row["last_received_at"].isoformat() if row else None,
         })
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Outbound email (002 / FR-014): whether and how this tenant sends
+# --------------------------------------------------------------------------- #
+
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_OUTBOUND_FIELDS = ("outbound_enabled", "sender_address", "sender_verified", "demo_mode", "test_inbox")
+
+
+def _valid_email(v: str | None) -> str | None:
+    if v is not None and not _EMAIL.match(v.strip()):
+        raise ValueError("must be an email address")
+    return v.strip() if v is not None else None
+
+
+class OutboundPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outbound_enabled: bool | None = None
+    sender_address: str | None = None
+    sender_verified: bool | None = None
+    demo_mode: bool | None = None
+    test_inbox: str | None = None
+
+    _check_sender = field_validator("sender_address")(_valid_email)
+    _check_inbox = field_validator("test_inbox")(_valid_email)
+
+
+def _outbound(session: Session) -> dict:
+    row = session.execute(text(f"SELECT {', '.join(_OUTBOUND_FIELDS)} FROM tenant_config")).mappings().one()
+    return {**row, "smtp_configured": bool(get_settings().smtp_host)}
+
+
+@router.get("/outbound")
+def get_outbound(_: uuid.UUID = Depends(require_operator), session: Session = Depends(get_session)):
+    return _outbound(session)
+
+
+@router.patch("/outbound")
+def patch_outbound(
+    req: OutboundPatch, operator: uuid.UUID = Depends(require_operator), session: Session = Depends(get_session),
+):
+    current = _outbound(session)
+    new = {k: current[k] for k in _OUTBOUND_FIELDS}
+    given = req.model_dump(exclude_unset=True)
+
+    # A new sender address has not been proven to be ours to send from: verification is revoked and
+    # sending is switched off until an operator verifies it again. Flags sent in the *same* request win,
+    # so one deliberate PATCH can set the address, verify it and enable sending.
+    if "sender_address" in given and (given["sender_address"] or "").lower() != (current["sender_address"] or "").lower():
+        new["sender_verified"], new["outbound_enabled"] = False, False
+    new.update(given)
+
+    if new["sender_verified"] and not new["sender_address"]:
+        raise HTTPException(status_code=409, detail="cannot verify a sender: no sender address is set")
+    if new["outbound_enabled"] and not (new["sender_address"] and new["sender_verified"]):
+        raise HTTPException(status_code=409, detail="outbound email needs a verified sender address first")
+
+    changed = {k: [current[k], new[k]] for k in _OUTBOUND_FIELDS if new[k] != current[k]}
+    if changed:
+        session.execute(
+            text("UPDATE tenant_config SET outbound_enabled = :outbound_enabled, sender_address = :sender_address,"
+                 " sender_verified = :sender_verified, demo_mode = :demo_mode, test_inbox = :test_inbox"),
+            new,
+        )
+        audit.record(session, "outbound_changed", actor_user_id=operator, detail={"changes": changed})
+    return _outbound(session)
+
+
+# --------------------------------------------------------------------------- #
+# Opt-outs (002 / FR-016): recipients we must not email again
+# --------------------------------------------------------------------------- #
+
+
+class OptOutCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str
+    reason: str | None = None
+
+    _check = field_validator("email")(lambda v: _valid_email(v).lower())
+
+
+@router.get("/opt-outs")
+def list_opt_outs(_: uuid.UUID = Depends(require_operator), session: Session = Depends(get_session)):
+    rows = session.execute(text("SELECT id, email, reason, created_at FROM contact_opt_out ORDER BY email")).mappings().all()
+    return [{"id": str(r["id"]), "email": r["email"], "reason": r["reason"], "created_at": r["created_at"].isoformat()}
+            for r in rows]
+
+
+@router.post("/opt-outs", status_code=201)
+def add_opt_out(
+    req: OptOutCreate, operator: uuid.UUID = Depends(require_operator), session: Session = Depends(get_session),
+):
+    session.execute(
+        text("INSERT INTO contact_opt_out (id, tenant_id, email, reason, created_by_user_id)"
+             " VALUES (:i, current_setting('pulse.tenant_id')::uuid, :e, :r, :u)"
+             " ON CONFLICT (tenant_id, email) DO NOTHING"),
+        {"i": uuid.uuid4(), "e": req.email, "r": req.reason, "u": operator},
+    )
+    row = session.execute(text("SELECT id FROM contact_opt_out WHERE email = :e"), {"e": req.email}).one()
+    audit.record(session, "opt_out_added", actor_user_id=operator, subject=req.email)
+    return {"id": str(row[0]), "email": req.email}
+
+
+@router.delete("/opt-outs/{opt_out_id}")
+def remove_opt_out(
+    opt_out_id: uuid.UUID, operator: uuid.UUID = Depends(require_operator), session: Session = Depends(get_session),
+):
+    email = session.execute(text("DELETE FROM contact_opt_out WHERE id = :i RETURNING email"), {"i": opt_out_id}).scalar()
+    if email is None:
+        raise HTTPException(status_code=404, detail="opt-out not found")
+    audit.record(session, "opt_out_removed", actor_user_id=operator, subject=email)
+    return {"removed": email}
