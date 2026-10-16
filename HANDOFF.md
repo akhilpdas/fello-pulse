@@ -387,3 +387,109 @@ untracked/modified files only, now also including `backend/pulse/agent/`,
   Phase 14 (hardening/delivery docs). The Phase 6 model-skill gap (B-15) and
   the TDD-provenance note above are both still open items worth a deliberate
   pass before calling the MVP done, not just moving on.
+
+---
+
+## Status as of 2026-10-16 (Phases 11–12)
+
+**Done and verified — Phase 11 (US5, T078–T081).** `api/routers/admin.py`:
+`GET/PATCH /admin/config` (unknown fields rejected, 422), `GET /admin/allowlist`,
+`PUT /admin/allowlist/{play_key}` (records the enabling operator; unknown play 404),
+`GET /admin/coverage` (per source: connected, events landed, unresolved events, last
+received — FR-012). Operator-only via `X-User-Id` resolving to `app_user.role =
+'operator'` (403 otherwise); all writes go through the RLS session, so an operator can
+only touch their own tenant. **TDD provenance:** T078–T080 test-first (watched fail on
+404). **T081 tests passed on first run** — they pin behaviour that already existed
+(absent-vs-zero in `features/compute.py`), so they are regression tests, not test-first.
+
+**Done and verified — Phase 12 (US6, T082–T083).** `api/routers/model.py`: `GET /model`
+serves the latest *promoted* card from `../artifacts/*.json` (404 if none), shaped as
+operating point, both baselines, calibration, per-tenant slices, seed, version. Sections
+the pipeline did not produce are reported `{"available": false, "reason": ...}`, never
+omitted. `ml/pipeline.py` now also records `operating_point` and the reliability curve.
+**Bug found against the real card, not by the synthetic tests:** tenant slices with no
+positives have NaN PR-AUC, which made `/model` 500; now served as `null` (test-first).
+**Deliberately dropped:** lead-time distribution — the panel carries no outcome dates, so
+the report states it unavailable (should be recorded in clarifications.md).
+
+**Open issue found:** `pulse.ml.pipeline` trains on *every* tenant in the database,
+including the leftover `agent-test-*` tenants the integration tests create. The newest
+promoted card (`m-20261016075744-dv-local-s7`) therefore includes test tenants in its
+per-tenant slices and training data. Needs a fix (restrict to real tenants / clean up
+test tenants) and a retrain before the model numbers are quoted anywhere.
+
+**Full suite: 174 passed** (run twice before the final test was added: stable).
+
+**Next:** see the delivery section below.
+
+---
+
+## Status as of 2026-10-16 (Phases 13–14 — delivery)
+
+**Phase 13 — frontend (T084–T090).** `frontend/`: React 19 + Vite + TypeScript. Queue, Account
+(driver bars, lazily-resolved evidence trail down to source payloads, score diff), Draft review
+(draft beside its grounding; edit/approve/reject), Run log, Low confidence. Types for paths and
+request bodies are generated from `contracts/openapi.yaml` (`npm run gen:api`); response bodies are
+hand-typed in `src/api/types.ts` because the routes return plain dicts. 13 vitest tests (formatting,
+API client incl. repeated array params and surfaced error detail); `npm run build` type-checks clean.
+Smoke-tested against real data through the Vite proxy for every endpoint the UI calls — but **not
+driven in a browser**; no interaction (clicks, approve, edit) has been exercised by a human or a browser test.
+New backend surface, all test-first: `GET /runs`, `GET /queue/low-confidence` (reason + remedy),
+`grounding` on actions, `GET /admin/*`, `GET /model`.
+
+**Phase 14 — delivery (T091–T097).** `infra/scripts/run_all.sh` (SC-014): ran against an *empty*
+scratch database (`PULSE_DB_NAME=pulse_verify`, feeds regenerated) → exit 0 in 208 s, 347,740 events
+ingested, model promoted, one cycle over 3 tenants. `contracts/openapi.yaml` generated and guarded by a
+drift test. README, quickstart, solution brief, deck outline, Loom script written. **T095 deck is a
+markdown outline, T096 is a script — neither rendered/recorded.** T097: full cycle over ~4,540 accounts
+= ~104 s against a 15-minute interval (SC-007).
+
+**Bugs found and fixed this pass (each with a failing test first, except where noted):**
+- Pipeline trained on test-seeded tenants → now only tenants with an ingestion watermark (B-23).
+- `/model` 500 on NaN per-tenant metrics → served as null.
+- Precision@capacity depended on DB row order via tied scores (0.30 vs 0.24, same AUC) → tie-aware (B-22); real figure 0.326 vs 0.021.
+- `agent_run.duration_ms` was hardcoded 0 → real wall-clock duration.
+- Vite proxy `localhost` → IPv6 ECONNREFUSED against uvicorn on IPv4 → `127.0.0.1` (found by smoke test, not covered by an automated test).
+- `tasks.md` T001–T027 were never ticked in the earlier sandbox session; ticked now **except** T004 (docker-compose, dropped) and T024–T027, which had **no test files at all** — written now, post-hoc, mutation-verified (docs/VERIFICATION.md).
+
+**Known open items.** SC-005/SC-006 not met (B-15, B-21); older tests (`test_scoring_service`,
+`test_queue_endpoint`) still write toy scores into the real `northwind` tenant of a dev DB, which makes
+"delta since last cycle" misleading there (a `run_all.sh` database is clean) (B-23); `ruff` shows
+pre-existing E501/E702 style findings; nothing in this session is committed.
+
+**Databases (changed at the end of the delivery pass).** `pulse` = demo only, rebuilt clean with
+`run_all.sh` (it had accumulated 375 tenants of test debris). `pulse_test` = what pytest uses
+(`tests/conftest.py` forces it, ignoring shell env; build once with `PULSE_DB_NAME=pulse_test bash
+infra/scripts/run_all.sh`). Verified: a full 196-test run left `pulse` unchanged. This resolves the
+"tests write toy scores into northwind" item in B-23 for the demo database. VS Code tasks: `.vscode/tasks.json`.
+
+---
+
+## Status as of 2026-10-16 (validation against the exercise sheet, then submission)
+
+Validated the build against the exercise brief point by point (data volumes/sources/messiness, the five
+non-negotiables, the deliverables). Findings and what was done:
+
+**Fixed (test-first, `tests/integration/test_worker_serve.py`, each test watched failing for its stated
+reason; full suite 201 passed):** the "runs without a human" non-negotiable was weaker than claimed.
+`worker.serve` had no entry point, no test, and nothing started it (B-24). While making it real: one
+failing tenant killed the worker; a failed cycle left no run record; "is it due?" compared wall-clock
+`started_at` to the injected clock. Now: `pulse serve [--simulate-present]` + VS Code task 4; failures
+are recorded as `failed` runs and isolated per tenant; recency is judged on `as_of`. `OffsetClock` added.
+**Live proof** (scratch copy of the demo DB, `PULSE_CYCLE_INTERVAL_MINUTES=1`, discarded afterwards): the
+worker, with nobody triggering anything, wrote a new `succeeded` run for each of the 3 tenants one interval
+after the previous ones (as_of 16:45:31 → 16:46:31; scored 1535/493/2512; 0 drafted, correctly — no new
+data, nothing changed). The demo DB was not touched (3 runs / 4,540 scores).
+
+**Deck:** `docs/Pulse_deck.pptx` (11 slides, built by `docs/build_deck.py` from `docs/DECK.md`; the queue slide
+carries the live top of the northwind queue). Only slide 1 was visually inspected (macOS Quick Look renders
+the first slide only); slides 2–11 are text and one table — open it and check the layout.
+
+**Data vs the sheet:** 5,000 accounts (3 tenants), **347,740** events (sheet says roughly 200,000 — 1.7× over, on
+purpose: three years of weekly usage rollups dominate), five sources, 9,252 events received >1 day after they
+occurred, 10,930 (3%) with an unresolved identity, 94 accounts with <5 events. The generated data's present
+(2026-11-10) is later than the machine's wall clock (2026-10-16); that is why the worker has `--simulate-present`.
+
+**Still not done, and not hidden:** SC-005/SC-006 (AUC 0.69; the two planted accounts are not flagged; no lead
+time); no real-browser run of the UI; the Loom is a script, not a recording; no hosted/"live" URL — it runs locally;
+no auth layer; nothing pushed to GitHub until the owner says so.

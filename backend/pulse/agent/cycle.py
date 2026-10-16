@@ -237,8 +237,9 @@ def run_cycle(
 
     session.execute(
         text(
-            "UPDATE agent_run SET status = 'succeeded', finished_at = now(),"
-            " duration_ms = 0, stage_counts = CAST(:sc AS jsonb),"
+            "UPDATE agent_run SET status = 'succeeded', finished_at = clock_timestamp(),"
+            " duration_ms = GREATEST(1, (extract(epoch FROM clock_timestamp() - started_at) * 1000)::int),"
+            " stage_counts = CAST(:sc AS jsonb),"
             " decisions_declined = CAST(:dd AS jsonb) WHERE id = :i"
         ),
         {"sc": json.dumps(stage_counts), "dd": json.dumps(declined), "i": run_id},

@@ -32,17 +32,27 @@ def reliability_curve(y_true, y_prob, n_bins: int = 10) -> list[dict]:
     return [{"predicted": float(p), "observed": float(o)} for p, o in zip(predicted, observed, strict=True)]
 
 
-def _top_n_indices(y_prob, capacity: int) -> np.ndarray:
+def _expected_top_n_sum(y_prob, contribution, capacity: int) -> tuple[float, int]:
+    """Sum of ``contribution`` over the top-``capacity`` rows by score, with ties
+    at the cut resolved by *expectation* (each tied row is equally likely to take
+    a remaining slot), not by row order. Calibration plateaus are common, and an
+    arbitrary tie-break would make a headline metric depend on database row order.
+    Returns the sum and the number of slots actually filled."""
+    y_prob = np.asarray(y_prob, dtype=float)
+    contribution = np.asarray(contribution, dtype=float)
     capacity = min(capacity, len(y_prob))
-    return np.argsort(-np.asarray(y_prob))[:capacity]
+    if capacity == 0:
+        return 0.0, 0
+    cut = np.sort(y_prob)[::-1][capacity - 1]
+    above = y_prob > cut
+    tied = y_prob == cut
+    slots_left = capacity - int(above.sum())
+    return float(contribution[above].sum() + slots_left * contribution[tied].mean()), capacity
 
 
 def precision_at_capacity(y_true, y_prob, capacity: int) -> float:
-    y_true = np.asarray(y_true)
-    idx = _top_n_indices(y_prob, capacity)
-    if len(idx) == 0:
-        return 0.0
-    return float(y_true[idx].mean())
+    total, filled = _expected_top_n_sum(y_prob, np.asarray(y_true, dtype=float), capacity)
+    return total / filled if filled else 0.0
 
 
 def captured_acv_at_capacity(y_true, y_prob, value_at_risk, capacity: int) -> float:
@@ -50,11 +60,11 @@ def captured_acv_at_capacity(y_true, y_prob, value_at_risk, capacity: int) -> fl
     top-``capacity`` queue would actually have surfaced."""
     y_true = np.asarray(y_true)
     value_at_risk = np.asarray(value_at_risk, dtype=float)
-    total_at_risk = value_at_risk[y_true == 1].sum()
+    at_risk = value_at_risk * (y_true == 1)
+    total_at_risk = at_risk.sum()
     if total_at_risk == 0:
         return 0.0
-    idx = _top_n_indices(y_prob, capacity)
-    caught = value_at_risk[idx][y_true[idx] == 1].sum()
+    caught, _ = _expected_top_n_sum(y_prob, at_risk, capacity)
     return float(caught / total_at_risk)
 
 

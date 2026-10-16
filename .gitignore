@@ -12,3 +12,4 @@ artifacts/
 *.joblib
 _snapshot.tar.gz
 .DS_Store
+pulse-sync.bundle

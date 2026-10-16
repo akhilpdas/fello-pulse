@@ -20,6 +20,7 @@ PGDATA="${PGDATA:-$HOME/.pgdata}"
 PGLOG="${PGLOG:-$HOME/.pglog/pg.log}"
 PGPORT="${PGPORT:-5432}"
 PGSOCK="${PGSOCK:-/tmp}"
+PULSE_DB_NAME="${PULSE_DB_NAME:-pulse}"
 
 mkdir -p "$(dirname "$PGLOG")"
 
@@ -49,12 +50,12 @@ END $$;
 SQL
 
 if ! psql -h "$PGSOCK" -p "$PGPORT" -U pulse -d postgres -tAc \
-     "SELECT 1 FROM pg_database WHERE datname='pulse'" | grep -q 1; then
+     "SELECT 1 FROM pg_database WHERE datname='$PULSE_DB_NAME'" | grep -q 1; then
   psql -h "$PGSOCK" -p "$PGPORT" -U pulse -d postgres -v ON_ERROR_STOP=1 \
-       -c "CREATE DATABASE pulse OWNER pulse"
+       -c "CREATE DATABASE \"$PULSE_DB_NAME\" OWNER pulse"
 fi
 
-psql -h "$PGSOCK" -p "$PGPORT" -U pulse -d pulse -v ON_ERROR_STOP=1 <<'SQL'
+psql -h "$PGSOCK" -p "$PGPORT" -U pulse -d "$PULSE_DB_NAME" -v ON_ERROR_STOP=1 <<'SQL'
 GRANT USAGE ON SCHEMA public TO pulse_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE pulse IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO pulse_app;
@@ -63,4 +64,4 @@ ALTER DEFAULT PRIVILEGES FOR ROLE pulse IN SCHEMA public
 SQL
 
 echo "==> ready"
-psql -h "$PGSOCK" -p "$PGPORT" -U pulse -d pulse -tAc "select 'pulse db ok: ' || version()"
+psql -h "$PGSOCK" -p "$PGPORT" -U pulse -d "$PULSE_DB_NAME" -tAc "select 'pulse db ok: ' || version()"

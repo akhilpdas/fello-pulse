@@ -16,9 +16,18 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import text
 
-from pulse.config import FrozenClock
-from pulse.db.models import TENANT_SCOPED_TABLES
-from pulse.db.session import dispose_engines, owner_session
+# The suite runs against its own database, never the demo one: tests seed and delete
+# tenants and write scores, and none of that should ever appear in the data you demo from.
+# Overridden unconditionally (not setdefault) so a shell that has the demo URLs exported
+# cannot redirect the tests at it. Must happen before pulse.config is first imported.
+_TEST_DB = os.environ.get("PULSE_TEST_DB", "pulse_test")
+_SOCKET = "host=/tmp&port=5432"
+os.environ["PULSE_DATABASE_URL_OWNER"] = f"postgresql+psycopg://pulse@/{_TEST_DB}?{_SOCKET}"
+os.environ["PULSE_DATABASE_URL_APP"] = f"postgresql+psycopg://pulse_app:pulse_app@/{_TEST_DB}?{_SOCKET}"
+
+from pulse.config import FrozenClock  # noqa: E402
+from pulse.db.models import TENANT_SCOPED_TABLES  # noqa: E402
+from pulse.db.session import dispose_engines, owner_session  # noqa: E402
 
 NOW = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,6 +36,16 @@ BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 @pytest.fixture(scope="session", autouse=True)
 def migrated_database():
     """Bring the schema to head once per test session."""
+    try:
+        with owner_session() as s:
+            has_data = s.execute(text("SELECT 1 FROM tenant WHERE slug = 'northwind'")).scalar()
+    except Exception:
+        has_data = None
+    if not has_data:
+        pytest.exit(
+            f"Test database '{_TEST_DB}' is missing or empty. Build it once with:\n"
+            f"    PULSE_DB_NAME={_TEST_DB} bash infra/scripts/run_all.sh\n"
+            "(the suite never uses the demo database).", returncode=3)
     subprocess.run(
         ["python3", "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
         cwd=BACKEND, check=True, capture_output=True,

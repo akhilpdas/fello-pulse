@@ -7,9 +7,12 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from pulse.api.routers import accounts, actions, queue
+from pulse.api.routers import accounts, actions, admin, model, queue, runs
 
 app = FastAPI(title="Pulse")
 app.include_router(queue.router)
 app.include_router(accounts.router)
 app.include_router(actions.router)
+app.include_router(admin.router)
+app.include_router(model.router)
+app.include_router(runs.router)

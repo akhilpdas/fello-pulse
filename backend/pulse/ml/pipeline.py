@@ -29,6 +29,7 @@ from pulse.ml.evaluate import (
     per_tenant_metrics,
     pr_auc,
     precision_at_capacity,
+    reliability_curve,
     roc_auc,
     trivial_baseline,
 )
@@ -43,6 +44,17 @@ from pulse.ml.registry import (
 from pulse.ml.train import predict_proba, time_based_split, train
 
 
+def trainable_tenants(session) -> list[tuple]:
+    """Tenants whose data arrived through ingestion (they have a watermark).
+    Tenants seeded directly -- test fixtures, consoles -- are excluded so they
+    can never leak into the production model or its per-tenant report."""
+    return list(session.execute(
+        text("SELECT id, slug FROM tenant WHERE EXISTS"
+             " (SELECT 1 FROM ingestion_watermark w WHERE w.tenant_id = tenant.id)"
+             " ORDER BY slug")
+    ).all())
+
+
 def build_full_panel(clock: Clock, horizon_days: int) -> tuple[list[PanelRow], list[str]]:
     """Every tenant, every account. Returns the panel plus a parallel list of
     tenant slugs -- PanelRow itself stays tenant-agnostic and pure."""
@@ -51,7 +63,7 @@ def build_full_panel(clock: Clock, horizon_days: int) -> tuple[list[PanelRow], l
     tenant_slugs: list[str] = []
 
     with elevated_session() as s:
-        tenants = s.execute(text("SELECT id, slug FROM tenant")).all()
+        tenants = trainable_tenants(s)
         for tenant_id, slug in tenants:
             cfg = s.execute(
                 text(
@@ -116,6 +128,8 @@ def run(clock: Clock | None = None, out_dir: Path = Path("../artifacts")) -> dic
         "roc_auc": roc_auc(y_test, proba),
         "pr_auc": pr_auc(y_test, proba),
         "brier": brier(y_test, proba),
+        "operating_point": {"capacity": capacity},
+        "reliability": reliability_curve(y_test, proba),
         "precision_at_capacity": precision_at_capacity(y_test, proba, capacity),
         "captured_acv_at_capacity": captured_acv_at_capacity(y_test, proba, value_at_risk, capacity),
         "baseline_trivial": {

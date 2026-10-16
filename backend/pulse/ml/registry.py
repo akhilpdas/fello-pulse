@@ -70,3 +70,14 @@ def write_model_card(card: ModelCard, directory: Path) -> Path:
 
 def make_version(data_version: str, seed: int) -> str:
     return f"m-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{data_version[-8:]}-s{seed}"
+
+
+def load_promoted_model(directory: Path) -> tuple[TrainedModel, str]:
+    """The newest promoted artefact in ``directory`` -- what serving uses. A
+    candidate that lost to the baseline has a card but is never returned."""
+    cards = [json.loads(p.read_text()) for p in directory.glob("*.json")] if directory.exists() else []
+    promoted = [c for c in cards if c.get("promoted")]
+    if not promoted:
+        raise LookupError(f"no promoted model in {directory}; run `python3 -m pulse.ml.pipeline`")
+    newest = max(promoted, key=lambda c: c["trained_at"])
+    return load_artifact(Path(newest["artifact_path"])), newest["version"]

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
 
 from fastapi import Depends, Header
 from sqlalchemy.orm import Session
@@ -33,3 +34,8 @@ def get_session(tenant_id: uuid.UUID = Depends(get_tenant_id)) -> Iterator[Sessi
 # applied to outbound dispatch rather than drafting).
 def get_transport() -> Transport:
     return RecordingTransport()
+
+
+def get_artifacts_dir() -> Path:
+    """Where the training pipeline writes model cards (pipeline.run's default)."""
+    return Path("../artifacts")

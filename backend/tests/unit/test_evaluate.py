@@ -51,3 +51,32 @@ def test_reliability_curve_has_one_point_per_requested_bin_with_data():
     curve = reliability_curve(y_true, y_prob, n_bins=5)
     assert len(curve) >= 1
     assert all("predicted" in p and "observed" in p for p in curve)
+
+
+def test_precision_at_capacity_does_not_depend_on_row_order_when_scores_tie():
+    # Isotonic calibration produces plateaus of tied scores; which tied rows land
+    # "in the top N" must not depend on arbitrary row order.
+    y_prob = [0.5] * 10
+    positives_first = [1, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+    positives_last = list(reversed(positives_first))
+    assert precision_at_capacity(positives_first, y_prob, capacity=2) == precision_at_capacity(
+        positives_last, y_prob, capacity=2)
+    # With no information in the scores, expected precision is the base rate.
+    assert abs(precision_at_capacity(positives_first, y_prob, capacity=2) - 0.2) < 1e-9
+
+
+def test_precision_at_capacity_takes_untied_leaders_whole_and_shares_the_tied_remainder():
+    y_true = [1, 1, 0, 0, 0]
+    y_prob = [0.9, 0.5, 0.5, 0.5, 0.1]  # one clear leader, then a 3-way tie for 2 slots
+    # slot 1: the leader (positive). slots 2-3: expected positives in the tie = 2 * (1/3)
+    assert abs(precision_at_capacity(y_true, y_prob, capacity=3) - (1 + 2 / 3) / 3) < 1e-9
+
+
+def test_captured_acv_is_order_invariant_under_ties():
+    value = [100.0, 100.0, 100.0, 100.0]
+    y_prob = [0.5] * 4
+    a = captured_acv_at_capacity([1, 0, 0, 1], y_prob, value, capacity=1)
+    b = captured_acv_at_capacity([0, 1, 1, 0], y_prob, value, capacity=1)
+    c = captured_acv_at_capacity([1, 0, 0, 1], y_prob[::-1], value, capacity=1)
+    assert abs(a - 0.25) < 1e-9 and abs(a - c) < 1e-9
+    assert abs(b - 0.25) < 1e-9  # one slot among four tied rows; half the tied value is positive

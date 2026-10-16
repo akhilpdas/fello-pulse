@@ -21,11 +21,11 @@ form the MVP — the queue is useless if untrustworthy (US2) or stale (US3).
 
 ## Phase 1: Setup
 
-- [ ] T001 Repository layout per plan.md: `backend/`, `generator/`, `frontend/`, `infra/`
-- [ ] T002 `backend/pyproject.toml` with pinned dependencies; `ruff` + `pytest` config
-- [ ] T003 [P] `infra/scripts/pg_bootstrap.sh` — local Postgres cluster, `pulse` owner, `pulse_app` NOBYPASSRLS role
-- [ ] T004 [P] `infra/docker-compose.yml` and `infra/Makefile` with the one-command path
-- [ ] T005 [P] `backend/pulse/config.py` — pydantic settings, injectable `Clock`, seeds
+- [X] T001 Repository layout per plan.md: `backend/`, `generator/`, `frontend/`, `infra/`
+- [X] T002 `backend/pyproject.toml` with pinned dependencies; `ruff` + `pytest` config
+- [X] T003 [P] `infra/scripts/pg_bootstrap.sh` — local Postgres cluster, `pulse` owner, `pulse_app` NOBYPASSRLS role
+- [~] T004 [P] `infra/docker-compose.yml` and `infra/Makefile` with the one-command path — **dropped**: Docker is unavailable where this was built; `infra/scripts/run_all.sh` is the one-command path (see README "Deliberately skipped")
+- [X] T005 [P] `backend/pulse/config.py` — pydantic settings, injectable `Clock`, seeds
 
 ---
 
@@ -34,14 +34,14 @@ form the MVP — the queue is useless if untrustworthy (US2) or stale (US3).
 **⚠️ Isolation and point-in-time posture must exist before any feature code. Both are
 ruinous to retrofit.**
 
-- [ ] T006 `backend/pulse/db/base.py` — declarative base, `TenantScoped` mixin
-- [ ] T007 `backend/pulse/db/models.py` — all 16 entities from data-model.md
-- [ ] T008 Alembic env + initial migration creating every table and index
-- [ ] T009 Migration enabling `ROW LEVEL SECURITY` **and** `FORCE ROW LEVEL SECURITY` with tenant policies on all tenant-scoped tables; grants to `pulse_app`
-- [ ] T010 `backend/pulse/db/session.py` — request session issuing `SET LOCAL pulse.tenant_id` inside an explicit transaction, plus a separately named elevated session factory for cross-tenant work
-- [ ] T011 [P] `tests/isolation/test_tenant_isolation.py` — unfiltered `SELECT *` per tenant-scoped table under tenant A asserts zero tenant-B rows
-- [ ] T012 [P] `tests/isolation/test_pool_claim_bleed.py` — two tenant sessions over one pooled connection, assert no claim leaks
-- [ ] T013 [P] `tests/isolation/test_app_role_cannot_bypass.py` — assert `pulse_app` lacks BYPASSRLS and that policies apply to the owner under FORCE
+- [X] T006 `backend/pulse/db/base.py` — declarative base, `TenantScoped` mixin
+- [X] T007 `backend/pulse/db/models.py` — all 16 entities from data-model.md
+- [X] T008 Alembic env + initial migration creating every table and index
+- [X] T009 Migration enabling `ROW LEVEL SECURITY` **and** `FORCE ROW LEVEL SECURITY` with tenant policies on all tenant-scoped tables; grants to `pulse_app`
+- [X] T010 `backend/pulse/db/session.py` — request session issuing `SET LOCAL pulse.tenant_id` inside an explicit transaction, plus a separately named elevated session factory for cross-tenant work
+- [X] T011 [P] `tests/isolation/test_tenant_isolation.py` — unfiltered `SELECT *` per tenant-scoped table under tenant A asserts zero tenant-B rows
+- [X] T012 [P] `tests/isolation/test_pool_claim_bleed.py` — two tenant sessions over one pooled connection, assert no claim leaks
+- [X] T013 [P] `tests/isolation/test_app_role_cannot_bypass.py` — assert `pulse_app` lacks BYPASSRLS and that policies apply to the owner under FORCE
 
 **Checkpoint**: isolation provable on an empty schema.
 
@@ -51,12 +51,12 @@ ruinous to retrofit.**
 
 Built before ingestion so ingestion is written against hostile data from line one.
 
-- [ ] T014 `generator/simulate.py` — latent mean-reverting health process per account with discrete shocks (champion departure, support failure, competitive eval, QBR, price rise)
-- [ ] T015 `generator/emit.py` — five emitters producing the contracts in `contracts/ingestion.md`, each observing the latent state with source-specific noise and lag
-- [ ] T016 `generator/pathologies.py` — lag distributions, out-of-order write order, duplicates, backfill burst, field rename, case drift, null rates, identity gaps, cold start, missing-source-per-tenant, weekday/holiday seasonality
-- [ ] T017 Churn-or-contraction decision drawn from the latent state with deliberate irreducible noise; plant the two named retrospective fixtures (slow support decline, fast champion collapse) per A7
-- [ ] T018 `generator/main.py` — seeded CLI writing `data/feeds/<tenant>/<source>.jsonl` plus a `data_version` manifest
-- [ ] T019 [P] `tests/unit/test_generator_realism.py` — assert positive-class rate in a plausible band, assert feeds are ordered by `received_at` and not by `occurred_at`, assert each pathology is present at its stated rate
+- [X] T014 `generator/simulate.py` — latent mean-reverting health process per account with discrete shocks (champion departure, support failure, competitive eval, QBR, price rise)
+- [X] T015 `generator/emit.py` — five emitters producing the contracts in `contracts/ingestion.md`, each observing the latent state with source-specific noise and lag
+- [X] T016 `generator/pathologies.py` — lag distributions, out-of-order write order, duplicates, backfill burst, field rename, case drift, null rates, identity gaps, cold start, missing-source-per-tenant, weekday/holiday seasonality
+- [X] T017 Churn-or-contraction decision drawn from the latent state with deliberate irreducible noise; plant the two named retrospective fixtures (slow support decline, fast champion collapse) per A7
+- [X] T018 `generator/main.py` — seeded CLI writing `data/feeds/<tenant>/<source>.jsonl` plus a `data_version` manifest
+- [X] T019 [P] `tests/unit/test_generator_realism.py` — assert positive-class rate in a plausible band, assert feeds are ordered by `received_at` and not by `occurred_at`, assert each pathology is present at its stated rate
 
 **Checkpoint**: 3 tenants, ~5,000 accounts, ~220k events, reproducible from a seed.
 
@@ -69,14 +69,14 @@ instruction.
 
 **Independent Test**: replay every feed twice; event count unchanged, watermarks advanced once.
 
-- [ ] T020 [P] [US3] `backend/pulse/ingest/contracts.py` — pydantic envelope + per-source payload models
-- [ ] T021 [US3] `backend/pulse/ingest/adapters/` — one adapter per source; normalise event types, resolve both spellings of the renamed field and the case drift
-- [ ] T022 [US3] `backend/pulse/ingest/identity.py` — source ref → account resolution with method and confidence; unresolved is a persisted state, not an exception
-- [ ] T023 [US3] `backend/pulse/ingest/service.py` — batch write with `ON CONFLICT DO NOTHING` on `(tenant_id, source, source_event_id)`, watermark advanced only after commit
-- [ ] T024 [P] [US3] `tests/integration/test_ingest_idempotent.py` — double replay, assert no duplicate rows and single watermark advance
-- [ ] T025 [P] [US3] `tests/integration/test_ingest_out_of_order.py` — assert a late record is accepted and does not reorder history
-- [ ] T026 [P] [US3] `tests/integration/test_schema_drift.py` — both field spellings and both type casings normalise identically
-- [ ] T027 [P] [US3] `tests/integration/test_identity_unresolved.py` — an unmapped ref is stored unresolved and surfaced, and does not create a phantom account
+- [X] T020 [P] [US3] `backend/pulse/ingest/contracts.py` — pydantic envelope + per-source payload models
+- [X] T021 [US3] `backend/pulse/ingest/adapters/` — one adapter per source; normalise event types, resolve both spellings of the renamed field and the case drift
+- [X] T022 [US3] `backend/pulse/ingest/identity.py` — source ref → account resolution with method and confidence; unresolved is a persisted state, not an exception
+- [X] T023 [US3] `backend/pulse/ingest/service.py` — batch write with `ON CONFLICT DO NOTHING` on `(tenant_id, source, source_event_id)`, watermark advanced only after commit
+- [X] T024 [P] [US3] `tests/integration/test_ingest_idempotent.py` — double replay, assert no duplicate rows and single watermark advance — written after the code (Phase 4 predates the TDD mandate); mutation-verified, see docs/VERIFICATION.md
+- [X] T025 [P] [US3] `tests/integration/test_ingest_out_of_order.py` — assert a late record is accepted and does not reorder history — written after the code (Phase 4 predates the TDD mandate); mutation-verified, see docs/VERIFICATION.md
+- [X] T026 [P] [US3] `tests/integration/test_schema_drift.py` — both field spellings and both type casings normalise identically — written after the code (Phase 4 predates the TDD mandate); mutation-verified, see docs/VERIFICATION.md
+- [X] T027 [P] [US3] `tests/integration/test_identity_unresolved.py` — an unmapped ref is stored unresolved and surfaced, and does not create a phantom account — written after the code (Phase 4 predates the TDD mandate); mutation-verified, see docs/VERIFICATION.md
 
 ---
 
@@ -166,41 +166,41 @@ instruction.
 
 ## Phase 11: US5 — Multi-tenant behaviour (Priority: P2)
 
-- [ ] T078 [US5] `backend/pulse/api/routers/admin.py` — per-tenant config and play allowlist management, operator role only
-- [ ] T079 [US5] Coverage reporting per tenant per source (FR-012)
-- [ ] T080 [P] [US5] `tests/integration/test_tenant_config_isolation.py` — a config change in one tenant alters only that tenant's behaviour
-- [ ] T081 [P] [US5] `tests/integration/test_missing_source_tenant.py` — the no-Gmail tenant scores with absent, not zero, email features
+- [X] T078 [US5] `backend/pulse/api/routers/admin.py` — per-tenant config and play allowlist management, operator role only
+- [X] T079 [US5] Coverage reporting per tenant per source (FR-012)
+- [X] T080 [P] [US5] `tests/integration/test_tenant_config_isolation.py` — a config change in one tenant alters only that tenant's behaviour
+- [X] T081 [P] [US5] `tests/integration/test_missing_source_tenant.py` — the no-Gmail tenant scores with absent, not zero, email features
 
 ---
 
 ## Phase 12: US6 — Model report (Priority: P3)
 
-- [ ] T082 [US6] `backend/pulse/api/routers/model.py` — serve the promoted model card
-- [ ] T083 [P] [US6] `tests/contract/test_model_report.py` — report contains operating point, both baselines, calibration, per-tenant slices, lead time, seed and version
+- [X] T082 [US6] `backend/pulse/api/routers/model.py` — serve the promoted model card
+- [X] T083 [P] [US6] `tests/contract/test_model_report.py` — report contains operating point, both baselines, calibration, per-tenant slices, lead time, seed and version
 
 ---
 
 ## Phase 13: Frontend
 
-- [ ] T084 Vite + React 19 + TS scaffold, typed API client generated against the OpenAPI schema
-- [ ] T085 [P] Queue page — ranked rows, tier, value at risk, days to renewal, dominant driver, delta since last cycle, below-the-cut count
-- [ ] T086 [P] Account page — driver bars, expandable feature values, evidence trail down to source payloads
-- [ ] T087 [P] Score-diff view — what moved and by how much
-- [ ] T088 [P] Draft review — draft beside its grounding evidence, approve/reject/edit
-- [ ] T089 [P] Run log — cycles with stage counts, declined decisions and durations
-- [ ] T090 [P] Low-confidence bucket as its own surface with reasons and remedies
+- [X] T084 Vite + React 19 + TS scaffold, typed API client generated against the OpenAPI schema
+- [X] T085 [P] Queue page — ranked rows, tier, value at risk, days to renewal, dominant driver, delta since last cycle, below-the-cut count
+- [X] T086 [P] Account page — driver bars, expandable feature values, evidence trail down to source payloads
+- [X] T087 [P] Score-diff view — what moved and by how much
+- [X] T088 [P] Draft review — draft beside its grounding evidence, approve/reject/edit
+- [X] T089 [P] Run log — cycles with stage counts, declined decisions and durations
+- [X] T090 [P] Low-confidence bucket as its own surface with reasons and remedies
 
 ---
 
 ## Phase 14: Hardening and delivery
 
-- [ ] T091 `infra/scripts/run_all.sh` — empty database → migrated → generated → ingested → trained → scored → serving (SC-014)
-- [ ] T092 Generate `contracts/openapi.yaml` from the application and commit it
-- [ ] T093 `quickstart.md` verified by running it from a clean state
-- [ ] T094 `README.md` — decisions, deliberately skipped, what breaks first at 10x
-- [ ] T095 Solution brief (one page) and the short deck
-- [ ] T096 Loom walkthrough script
-- [ ] T097 Full suite green; record cycle duration over 5,000 accounts against SC-007
+- [X] T091 `infra/scripts/run_all.sh` — empty database → migrated → generated → ingested → trained → scored → serving (SC-014)
+- [X] T092 Generate `contracts/openapi.yaml` from the application and commit it
+- [X] T093 `quickstart.md` verified by running it from a clean state
+- [X] T094 `README.md` — decisions, deliberately skipped, what breaks first at 10x
+- [X] T095 Solution brief (one page) and the short deck — `docs/SOLUTION_BRIEF.md`, `docs/DECK.md` (markdown outline; no .pptx rendered)
+- [X] T096 Loom walkthrough script — `docs/LOOM_SCRIPT.md` (script only; the recording itself is not done)
+- [X] T097 Full suite green; record cycle duration over 5,000 accounts against SC-007
 
 ---
 

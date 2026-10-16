@@ -1,0 +1,129 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Pulse: 1. start Postgres",
+      "type": "shell",
+      "command": "/opt/homebrew/opt/postgresql@16/bin/pg_ctl -D ~/.pgdata status >/dev/null 2>&1 && echo 'postgres already running' || /opt/homebrew/opt/postgresql@16/bin/pg_ctl -D ~/.pgdata -l ~/.pgdata/pg.log start",
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: 2. build demo data (~4 min; safe to re-run)",
+      "type": "shell",
+      "command": "bash infra/scripts/run_all.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: RESET demo database (drops 'pulse' only)",
+      "type": "shell",
+      "command": "psql -h /tmp -U pulse -d postgres -c 'DROP DATABASE IF EXISTS pulse WITH (FORCE)' && echo 'dropped. Now run: Pulse: 2. build demo data'",
+      "presentation": {
+        "panel": "shared",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: API (http://localhost:8000/docs)",
+      "type": "shell",
+      "command": "source .venv/bin/activate && PGTZ=UTC uvicorn pulse.api.main:app --port 8000 --reload",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "pulse-demo",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: UI (http://localhost:5173)",
+      "type": "shell",
+      "command": "[ -d node_modules ] || npm install; npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "pulse-demo",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: 3. run the demo (API + UI)",
+      "dependsOn": [
+        "Pulse: API (http://localhost:8000/docs)",
+        "Pulse: UI (http://localhost:5173)"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: 4. unattended worker (the agent: cycles every 15 min, nobody triggers it)",
+      "type": "shell",
+      "command": "source .venv/bin/activate && PGTZ=UTC python3 -m pulse.cli serve --simulate-present",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: show demo tenant + user ids (paste into the UI)",
+      "type": "shell",
+      "command": "psql -h /tmp -U pulse -d pulse -Atc \"SELECT format('%-10s tenant id: %s   operator user id: %s', t.slug, t.id, u.id) FROM tenant t JOIN app_user u ON u.tenant_id = t.id AND u.role = 'operator' WHERE EXISTS (SELECT 1 FROM ingestion_watermark w WHERE w.tenant_id = t.id) ORDER BY t.slug\"",
+      "presentation": {
+        "panel": "shared",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: backend tests (uses pulse_test, never the demo data)",
+      "type": "shell",
+      "command": "source .venv/bin/activate && PGTZ=UTC python3 -m pytest -q",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "group": "test",
+      "presentation": {
+        "panel": "shared",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: frontend tests + build",
+      "type": "shell",
+      "command": "npm test && npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "group": "test",
+      "presentation": {
+        "panel": "shared",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -50,7 +50,7 @@ def _row_to_dict(row) -> dict:
         "decided_at": row["decided_at"].isoformat() if row["decided_at"] else None,
         "decided_by_user_id": str(row["decided_by_user_id"]) if row["decided_by_user_id"] else None,
         "sent_at": row["sent_at"].isoformat() if row["sent_at"] else None,
-        "attempts": row["attempts"],
+        "attempts": row["attempts"], "grounding": row["grounding"],
     }
 
 
@@ -58,7 +58,7 @@ def _fetch(session: Session, action_id: uuid.UUID) -> dict:
     row = session.execute(
         text(
             "SELECT id, account_id, play_key, state, state_reason, channel, subject, body,"
-            " draft_source, created_at, decided_at, decided_by_user_id, sent_at, attempts"
+            " draft_source, created_at, decided_at, decided_by_user_id, sent_at, attempts, grounding"
             " FROM action WHERE id = :i"
         ),
         {"i": action_id},
@@ -71,7 +71,7 @@ def _fetch(session: Session, action_id: uuid.UUID) -> dict:
 @router.get("/actions")
 def list_actions(state: str | None = Query(default=None), session: Session = Depends(get_session)):
     sql = "SELECT id, account_id, play_key, state, state_reason, channel, subject, body," \
-          " draft_source, created_at, decided_at, decided_by_user_id, sent_at, attempts FROM action"
+          " draft_source, created_at, decided_at, decided_by_user_id, sent_at, attempts, grounding FROM action"
     params = {}
     if state is not None:
         sql += " WHERE state = :state"

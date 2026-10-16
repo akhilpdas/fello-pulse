@@ -107,6 +107,67 @@ def cmd_status(args) -> int:
     return 0
 
 
+def cmd_cycle(args) -> int:
+    """One autonomous cycle for every ingested tenant, as of ``--as-of`` (default:
+    the newest event received). Thin wrapper over agent.worker.tick -- no decisions here."""
+    from pulse.agent.transport import RecordingTransport
+    from pulse.agent.worker import build_runtime, tick
+    from pulse.config import FrozenClock, get_settings
+    from pulse.db.session import elevated_session
+    from pulse.ml.pipeline import trainable_tenants
+    from pulse.ml.registry import load_promoted_model
+
+    model, version = load_promoted_model(Path(args.artifacts))
+    with elevated_session() as s:
+        tenants = trainable_tenants(s)
+    with owner_session() as s:
+        as_of = (datetime.fromisoformat(args.as_of) if args.as_of
+                 else s.execute(text("SELECT max(received_at) FROM source_event")).scalar())
+    runtimes = [build_runtime(tid, model=model, model_version=version, transport=RecordingTransport())
+                for tid, _ in tenants]
+    settings = get_settings()
+    t0 = time.time()
+    results = tick(runtimes, clock=FrozenClock(as_of), worker_id="cli", lease_seconds=settings.lease_seconds,
+                   cycle_interval_minutes=settings.cycle_interval_minutes)
+    print(f"model {version}, as_of {as_of.isoformat()}, {len(results)}/{len(runtimes)} tenants ran "
+          f"in {time.time() - t0:.1f}s")
+    for r in results:
+        print(f"  run {r.run_id}: {r.stage_counts} declined={len(r.decisions_declined)}")
+    return 0
+
+
+def cmd_serve(args) -> int:
+    """The unattended worker: tick every few seconds, cycle each tenant when it is due.
+    ``--simulate-present`` runs on the data's present (its newest event) and lets it advance in
+    real time -- the demo data is dated later than the wall clock. Thin wrapper over worker.serve."""
+    from pulse.agent.transport import RecordingTransport
+    from pulse.agent.worker import build_runtime, serve
+    from pulse.config import OffsetClock, SystemClock, get_settings
+    from pulse.db.session import elevated_session
+    from pulse.ml.pipeline import trainable_tenants
+    from pulse.ml.registry import load_promoted_model
+
+    model, version = load_promoted_model(Path(args.artifacts))
+    with elevated_session() as s:
+        tenants = trainable_tenants(s)
+    runtimes = [build_runtime(tid, model=model, model_version=version, transport=RecordingTransport())
+                for tid, _ in tenants]
+    clock = SystemClock()
+    if args.simulate_present:
+        with owner_session() as s:
+            newest = s.execute(text("SELECT max(received_at) FROM source_event")).scalar()
+        clock = OffsetClock(base=clock, offset=newest - clock.now())
+    settings = get_settings()
+    print(f"pulse worker: {len(runtimes)} tenants, model {version}, cycle every "
+          f"{settings.cycle_interval_minutes} min, tick {settings.worker_tick_seconds}s, "
+          f"clock now {clock.now().isoformat()}  (Ctrl-C to stop)", flush=True)
+    try:
+        serve(runtimes, clock=clock, max_ticks=args.max_ticks)
+    except KeyboardInterrupt:
+        print("stopped")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="pulse")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -115,6 +176,11 @@ def main() -> int:
     i = sub.add_parser("ingest"); i.add_argument("--feeds", default="../data/feeds")
     i.add_argument("--until", default=None); i.set_defaults(fn=cmd_ingest)
     st = sub.add_parser("status"); st.set_defaults(fn=cmd_status)
+    c = sub.add_parser("cycle"); c.add_argument("--as-of", default=None)
+    c.add_argument("--artifacts", default="../artifacts"); c.set_defaults(fn=cmd_cycle)
+    sv = sub.add_parser("serve"); sv.add_argument("--artifacts", default="../artifacts")
+    sv.add_argument("--simulate-present", action="store_true")
+    sv.add_argument("--max-ticks", type=int, default=None); sv.set_defaults(fn=cmd_serve)
     args = ap.parse_args()
     return args.fn(args)
 

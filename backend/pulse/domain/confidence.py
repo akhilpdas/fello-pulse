@@ -32,3 +32,13 @@ def assess_confidence(
     if unresolved:
         return ConfidenceResult("low", True, "no_billing_identity")
     return ConfidenceResult("high", False, None)
+
+
+# What a person can do about each abstain reason (the low-confidence surface
+# shows these beside the reason code, so a low-confidence account is a task
+# with a next step, not a dead end).
+REMEDIES = {
+    "insufficient_history": "Too little history to score reliably. Re-check once more activity has accumulated, or review the account manually.",
+    "insufficient_sources": "Too few connected data sources have data for this account. Connect or repair the missing sources.",
+    "no_billing_identity": "The account could not be matched to a billing record. Resolve the identity link so billing signals count.",
+}

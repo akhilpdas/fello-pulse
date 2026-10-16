@@ -29,6 +29,18 @@ class SystemClock:
         return datetime.now(UTC)
 
 
+@dataclass(frozen=True)
+class OffsetClock:
+    """``base`` shifted by a fixed amount. The demo data's present (its newest event) is
+    later than the wall clock, so the worker runs on the data's present and keeps moving."""
+
+    base: Clock
+    offset: timedelta
+
+    def now(self) -> datetime:
+        return self.base.now() + self.offset
+
+
 @dataclass
 class FrozenClock:
     """A clock that only moves when a test moves it."""

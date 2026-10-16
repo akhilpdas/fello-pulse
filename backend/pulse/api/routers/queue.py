@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from pulse.api.deps import get_session
+from pulse.domain.confidence import REMEDIES
 
 router = APIRouter()
 
@@ -82,3 +83,28 @@ def get_queue(
 
     below_cut = max(0, len(rows) - capacity)
     return {"as_of": as_of.isoformat(), "rows": out_rows, "below_cut": below_cut}
+
+
+@router.get("/queue/low-confidence")
+def get_low_confidence(
+    as_of: datetime | None = Query(default=None),
+    session: Session = Depends(get_session),
+):
+    """Accounts the system declined to score (SC-012): their own surface, with the
+    machine-readable reason and a human remedy, never folded into the ranked queue."""
+    if as_of is None:
+        as_of = session.execute(text("SELECT max(as_of) FROM score")).scalar()
+        if as_of is None:
+            return {"as_of": None, "rows": []}
+    rows = session.execute(
+        text("SELECT s.account_id, a.name, s.abstain_reason, s.value_at_risk_cents"
+             " FROM score s JOIN account a ON a.id = s.account_id"
+             " WHERE s.as_of = :as_of AND s.tier = 'abstain'"
+             " ORDER BY s.value_at_risk_cents DESC NULLS LAST, a.name"),
+        {"as_of": as_of},
+    ).mappings().all()
+    return {"as_of": as_of.isoformat(), "rows": [
+        {"account_id": str(r["account_id"]), "account_name": r["name"],
+         "abstain_reason": r["abstain_reason"], "value_at_risk_cents": r["value_at_risk_cents"],
+         "remedy": REMEDIES.get(r["abstain_reason"], "Review the account's data coverage.")}
+        for r in rows]}

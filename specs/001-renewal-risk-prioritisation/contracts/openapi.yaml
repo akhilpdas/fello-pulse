@@ -1,0 +1,699 @@
+openapi: 3.1.0
+info:
+  title: Pulse
+  version: 0.1.0
+paths:
+  /queue:
+    get:
+      summary: Get Queue
+      operationId: get_queue_queue_get
+      parameters:
+      - name: as_of
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: As Of
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /queue/low-confidence:
+    get:
+      summary: Get Low Confidence
+      description: 'Accounts the system declined to score (SC-012): their own surface,
+        with the
+
+        machine-readable reason and a human remedy, never folded into the ranked queue.'
+      operationId: get_low_confidence_queue_low_confidence_get
+      parameters:
+      - name: as_of
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: As Of
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /accounts/{account_id}:
+    get:
+      summary: Get Account
+      operationId: get_account_accounts__account_id__get
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Account Id
+      - name: as_of
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: As Of
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /accounts/{account_id}/evidence:
+    get:
+      summary: Get Evidence
+      description: 'Resolve evidence ids to the original source records. Scoped to
+        the
+
+        account so one account''s evidence can never be used to pull another''s.'
+      operationId: get_evidence_accounts__account_id__evidence_get
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Account Id
+      - name: event_ids
+        in: query
+        required: true
+        schema:
+          type: array
+          items:
+            type: integer
+          title: Event Ids
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /accounts/{account_id}/score-diff:
+    get:
+      summary: Score Diff
+      description: 'Feature-level diff between two scores, with the per-feature
+
+        contribution change -- "why did this move," answerable without a data
+
+        pull (FR-027).'
+      operationId: score_diff_accounts__account_id__score_diff_get
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Account Id
+      - name: from_as_of
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+          title: From As Of
+      - name: to_as_of
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+          title: To As Of
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /actions:
+    get:
+      summary: List Actions
+      operationId: list_actions_actions_get
+      parameters:
+      - name: state
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: State
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /actions/{action_id}/approve:
+    post:
+      summary: Approve Action
+      operationId: approve_action_actions__action_id__approve_post
+      parameters:
+      - name: action_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Action Id
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /actions/{action_id}/reject:
+    post:
+      summary: Reject Action
+      operationId: reject_action_actions__action_id__reject_post
+      parameters:
+      - name: action_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Action Id
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /actions/{action_id}:
+    patch:
+      summary: Edit Action
+      operationId: edit_action_actions__action_id__patch
+      parameters:
+      - name: action_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Action Id
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/config:
+    get:
+      summary: Get Config
+      operationId: get_config_admin_config_get
+      parameters:
+      - name: x-user-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-User-Id
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      summary: Patch Config
+      operationId: patch_config_admin_config_patch
+      parameters:
+      - name: x-user-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-User-Id
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/allowlist:
+    get:
+      summary: Get Allowlist
+      operationId: get_allowlist_admin_allowlist_get
+      parameters:
+      - name: x-user-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-User-Id
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/allowlist/{play_key}:
+    put:
+      summary: Put Allowlist
+      operationId: put_allowlist_admin_allowlist__play_key__put
+      parameters:
+      - name: play_key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Play Key
+      - name: x-user-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-User-Id
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllowlistPut'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/coverage:
+    get:
+      summary: Get Coverage
+      description: 'FR-012: per source, whether it is connected and what has actually
+        landed.
+
+        A source that is not connected reports zero events and no timestamp -- it
+        is
+
+        absent, which is different from connected-and-silent.'
+      operationId: get_coverage_admin_coverage_get
+      parameters:
+      - name: x-user-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-User-Id
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /model:
+    get:
+      summary: Get Model Report
+      operationId: get_model_report_model_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /runs:
+    get:
+      summary: List Runs
+      operationId: list_runs_runs_get
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: x-tenant-id
+        in: header
+        required: true
+        schema:
+          type: string
+          title: X-Tenant-Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    AllowlistPut:
+      properties:
+        auto_send:
+          type: boolean
+          title: Auto Send
+      type: object
+      required:
+      - auto_send
+      title: AllowlistPut
+    ApproveRequest:
+      properties:
+        actor_user_id:
+          type: string
+          format: uuid
+          title: Actor User Id
+      type: object
+      required:
+      - actor_user_id
+      title: ApproveRequest
+    ConfigPatch:
+      properties:
+        horizon_days:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Horizon Days
+        contraction_threshold:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Contraction Threshold
+        weekly_capacity:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Weekly Capacity
+        tier_red_at:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Tier Red At
+        tier_amber_at:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Tier Amber At
+        min_days_history:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Min Days History
+        min_sources_with_data:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Min Sources With Data
+        suppression_days:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Suppression Days
+        max_sends_per_cycle:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Max Sends Per Cycle
+        material_delta:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Material Delta
+      additionalProperties: false
+      type: object
+      title: ConfigPatch
+    EditRequest:
+      properties:
+        actor_user_id:
+          type: string
+          format: uuid
+          title: Actor User Id
+        subject:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Subject
+        body:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Body
+      type: object
+      required:
+      - actor_user_id
+      title: EditRequest
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    RejectRequest:
+      properties:
+        actor_user_id:
+          type: string
+          format: uuid
+          title: Actor User Id
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+      type: object
+      required:
+      - actor_user_id
+      title: RejectRequest
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError

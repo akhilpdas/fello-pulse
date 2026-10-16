@@ -452,3 +452,59 @@ volume driving a deterministic dominant driver — `test_scoring_service.py`'s
 northwind-based tests remain fine because they assert generic properties
 (tier is one of four values, probability in `[0, 1]`) that don't depend on
 run history.
+
+### B-21 — Lead time is not reported, and the report says so (SC-005, FR report)
+
+`GET /model` returns `lead_time_days: {"available": false, "reason": ...}` rather than a
+number. Lead time needs the date of each outcome next to the first threshold crossing, and
+`PanelRow` carries only `(account, as_of, features, label)`. Deriving it for the whole panel
+is real work, and computing it only for the two planted fixtures — which the model does not
+flag (B-15) — would produce a flattering-looking nothing. Dropped deliberately; the
+alternative rejected was a placeholder figure. Revisit together with the B-15 feature work.
+
+### B-22 — Precision@capacity is tie-aware (a bug found by running the pipeline three times)
+
+Three runs on identical data gave precision@100 of 0.30, 0.30 and 0.24 with identical AUC.
+Isotonic calibration produces plateaus of tied scores, and `argsort` broke ties by database
+row order, so the headline operating-point metric (and with it the promotion gate) depended
+on an arbitrary ordering. `precision_at_capacity` and `captured_acv_at_capacity` now resolve
+ties at the cut by expectation (each tied row equally likely to take a remaining slot); the
+figure is 0.326 vs 0.021 for the heuristic baseline, identical across reruns. The earlier
+0.30/0.32/0.24 figures were noise from tie-breaking and should not be quoted.
+
+### B-23 — Training only reads ingested tenants
+
+`pulse.ml.pipeline` trained on every row of `tenant`, including tenants that integration tests
+seed directly, so a promoted model's training data and per-tenant report included `agent-test-*`.
+Trainable tenants are now those with an `ingestion_watermark` (i.e. whose data arrived through
+the ingestion path). Caveat: some older tests (`test_scoring_service`, `test_queue_endpoint`)
+still write toy-model scores into the real `northwind` tenant of a development database, which
+makes the queue's "delta since last cycle" misleading *there*. A database built by `run_all.sh`
+is clean (verified); the tests should move to throwaway tenants like the Phase 9 ones (B-20).
+
+### B-24 — The unattended loop was not actually runnable; three defects found by validating against the brief
+
+The brief's non-negotiable is that something runs *without a human triggering it*. Validation
+found that `worker.serve` (the loop) had no entry point, no test, and was not started by anything:
+the only way to run a cycle was a person typing `pulse cycle`. Making it real exposed two more:
+
+1. **One failing tenant killed the worker.** `tick` re-raised, so tenant A's exception stopped
+   tenants B, C and D. It now logs and continues.
+2. **A failed cycle left no trace.** The cycle is one transaction, so its `running` row rolled
+   back with the failure; the run log showed nothing and `due_tenants`'s "a failed run is due
+   again" rule had nothing to see. `run_once` now records a `failed` run (with the error) in its own
+   transaction.
+3. **"Is this tenant due?" compared two clocks.** It tested wall-clock `started_at` against the
+   injected clock, so under a simulated clock every tenant was always due (a hot loop). It now
+   compares `as_of`, the injected clock's own domain; identical in production.
+
+Fixed test-first (`tests/integration/test_worker_serve.py`, each test watched failing for its stated
+reason). `pulse serve` is the entry point; `--simulate-present` runs on the data's present (its
+newest event) via `OffsetClock`, because the generated data is dated later than the wall clock.
+
+Known limits, not fixed: a *persistently* failing tenant is retried every tick (30 s) with no
+backoff, each attempt leaving a `failed` run row; the whole-tenant cycle is still one transaction
+(one bad account fails the tenant's cycle — per-account isolation is the 10× work already listed);
+and re-running `pulse cycle` at an unchanged `as_of` is now a no-op (the tenant already ran inside
+the interval), which is correct but silent beyond "0/N tenants ran".
+
