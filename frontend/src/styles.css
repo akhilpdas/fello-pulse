@@ -23,3 +23,7 @@ th { font-size:12px; color:var(--muted); font-weight:600; } a { color:var(--acce
 .draft input, .draft textarea { width:100%; font:inherit; margin-bottom:6px; background:var(--bg); color:var(--fg); border:1px solid var(--line); padding:6px; }
 .state { font-size:12px; padding:1px 6px; border:1px solid var(--line); border-radius:4px; }
 button { font:inherit; padding:4px 12px; cursor:pointer; } button:disabled { cursor:not-allowed; opacity:.5; }
+
+.login { max-width:340px; margin:60px auto; display:flex; flex-direction:column; gap:12px; }
+.login label { display:flex; flex-direction:column; gap:4px; font-size:13px; }
+.session { align-items:center; }

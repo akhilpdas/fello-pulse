@@ -36,6 +36,7 @@ from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from pulse.auth.passwords import hash_password
 from pulse.config import Clock
 from pulse.ingest.adapters import ADAPTERS, UnknownEventType
 from pulse.ingest.contracts import IngestResult, NormalizedEvent, SourceRecord
@@ -83,9 +84,14 @@ def bootstrap_tenant(session: Session, feed_dir: Path) -> BootstrapResult:
 
 
 def provision_tenant_data(
-    session: Session, tenant_id: uuid.UUID, feed_dir: Path
+    session: Session, tenant_id: uuid.UUID, feed_dir: Path, *, demo_password: str | None = None,
 ) -> BootstrapResult:
-    """Config, users, accounts and identity links, inside the tenant's own session."""
+    """Config, users, accounts and identity links, inside the tenant's own session.
+
+    ``demo_password``, if given, is set (hashed, with a per-user salt) on every user that does not
+    already have a password -- so a database built for a demo can be signed in to, and re-running this
+    never overwrites a password someone chose. It is supplied by the caller; there is no default.
+    """
     cfg = json.loads((feed_dir / "tenant.json").read_text())
 
     overrides = cfg.get("config", {})
@@ -121,6 +127,12 @@ def provision_tenant_data(
             text("SELECT id FROM app_user WHERE email = :e"), {"e": u["email"]}
         ).scalar()
         ref_to_user[u["ref"]] = actual
+        if demo_password:
+            session.execute(
+                text("UPDATE app_user SET password_hash = :h, password_changed_at = now()"
+                     " WHERE id = :i AND password_hash IS NULL"),
+                {"h": hash_password(demo_password), "i": actual},
+            )
 
     # Accounts come from the identity map's external references. Attributes are
     # filled in afterwards from the CRM event stream, which is where they

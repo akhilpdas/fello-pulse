@@ -114,3 +114,18 @@ def seed_tenant(as_of: datetime) -> tuple[uuid.UUID, dict]:
         "suppression_days": row[6], "max_sends_per_cycle": row[7],
     }
     return tenant_id, tenant_config
+
+
+def seed_scored_account(slug: str, *, as_of: datetime | None = None, n_tickets: int = 12):
+    """A fresh tenant with one account that has a persisted score. Returns (tenant_id, account_id, as_of)."""
+    from pulse.db.session import tenant_session
+    from pulse.scoring.service import score_and_persist
+
+    as_of = as_of or datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
+    tenant_id, cfg = seed_tenant(as_of)
+    with owner_session() as s:
+        account_id = seed_account(s, tenant_id, as_of, slug, n_tickets=n_tickets)
+    with tenant_session(tenant_id) as s:
+        score_and_persist(s, tenant_id=tenant_id, account_id=account_id, model=toy_support_model(3),
+                          model_version="t", tenant_config=cfg, as_of=as_of)
+    return tenant_id, account_id, as_of

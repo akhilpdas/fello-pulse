@@ -508,3 +508,24 @@ backoff, each attempt leaving a `failed` run row; the whole-tenant cycle is stil
 and re-running `pulse cycle` at an unchanged `as_of` is now a no-op (the tenant already ran inside
 the interval), which is correct but silent beyond "0/N tenants ran".
 
+### B-25 — The headline numbers were stale, and per-tenant attribution was wrong (found while building leave-one-tenant-out)
+
+1. **Stale figures.** The README, brief, deck and HANDOFF quoted precision@100 **0.33** (0.326) and
+   ROC-AUC **0.69**. Re-running the pipeline on the current demo data gives **0.196 and 0.684**, identical
+   across two runs hours apart (so it is deterministic now). The model cards show the figure drifting
+   0.300 → 0.326 → 0.288 → 0.196 across the day's runs while the test block stayed the same size (13,086);
+   the 0.326 predates the clean rebuild of the demo database. I could not reproduce the earlier figure and
+   do not claim to know the cause. **The reproducible figure is 0.196 vs 0.021 for the heuristic baseline
+   (~9×), ROC-AUC 0.684.** B-22 above quotes 0.326 and is superseded by this entry. All documents corrected.
+   Captured value at the operating point is very small (0.009 of at-risk value in the cut).
+2. **Per-tenant metrics were attributed to the wrong tenants.** The pipeline paired the time-sorted test
+   block with the tenant-ordered slug list, so every model card said `northwind: n=13086` — one tenant
+   owning the whole test block. Fixed test-first (`test_panel_tenant_alignment.py`,
+   `pipeline.split_with_tenants`). The real split is globex 4,212 / initech 844 / northwind 8,030, with test
+   ROC-AUC 0.729 / 0.572 / 0.669. Earlier "per-tenant performance" claims were wrong.
+3. **Leave-one-tenant-out (001/FR-018) is now built** (`evaluate.leave_one_tenant_out`; train on the other
+   tenants before the test period, score this tenant after it; ~3.4 s). Cold-start AUC / precision@100:
+   globex 0.720 / 0.321, initech 0.575 / 0.060 (844 rows), northwind 0.672 / 0.091. **Reading:** a new tenant
+   the model has never seen gets weak ranking, and a *small* new tenant gets almost none — the shared-model
+   decision (B-7) is defensible for the big tenants and not for a 500-account one. That is a finding, not a pass.
+

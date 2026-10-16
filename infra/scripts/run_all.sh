@@ -5,7 +5,7 @@
 #   SERVE=1 bash infra/scripts/run_all.sh    # ...then serve the API on :8000
 #
 # Stages: postgres -> python env -> migrate -> generate -> bootstrap tenants ->
-# ingest -> train -> one autonomous cycle -> print tenant/operator ids for the UI.
+# ingest -> train -> one autonomous cycle -> print the sign-in details for the UI.
 # Every stage is idempotent, so re-running on a populated database is safe.
 #
 # Env: PULSE_DB_NAME (default pulse; use another name to build beside your data),
@@ -46,6 +46,15 @@ fi
 
 cd backend
 step "5/8 bootstrap tenants, users and accounts"
+# Demo sign-in password: generated once per database name, kept in a git-ignored local file (0600) so a
+# rebuild reuses it, and never committed. Only users that have no password get it; set PULSE_DEMO_PASSWORD
+# yourself to choose one.
+CRED_FILE="$ROOT/.demo-credentials.$PULSE_DB_NAME"
+if [ -z "${PULSE_DEMO_PASSWORD:-}" ]; then
+  [ -f "$CRED_FILE" ] || { umask 077; python3 -c 'import secrets; print(secrets.token_urlsafe(12))' > "$CRED_FILE"; }
+  PULSE_DEMO_PASSWORD="$(cat "$CRED_FILE")"
+fi
+export PULSE_DEMO_PASSWORD
 python3 -m pulse.cli bootstrap
 
 step "6/8 ingest"
@@ -58,16 +67,17 @@ step "8/8 one autonomous cycle (score -> detect -> draft -> record)"
 python3 -m pulse.cli cycle
 
 step "ready in $(( $(date +%s) - t0 ))s"
+echo
+echo "Sign in at http://localhost:5173  (workspace = the tenant name; the password is the same for every demo user)"
 psql -h "${PGSOCK:-/tmp}" -p "${PGPORT:-5432}" -U pulse -d "$PULSE_DB_NAME" -Atc \
-  "SELECT format('%-10s tenant id: %s   operator user id: %s', t.slug, t.id, u.id)
+  "SELECT format('  workspace %-10s operator %s', t.slug, u.email)
    FROM tenant t JOIN app_user u ON u.tenant_id = t.id AND u.role = 'operator'
    WHERE EXISTS (SELECT 1 FROM ingestion_watermark w WHERE w.tenant_id = t.id) ORDER BY t.slug"
+echo "  password: $PULSE_DEMO_PASSWORD      (kept in $CRED_FILE, which is git-ignored)"
+echo "  CSMs sign in the same way, e.g. csm01@northwind.example.com (they see only their own accounts)."
 cat <<MSG
 
 API:       cd backend && source .venv/bin/activate && uvicorn pulse.api.main:app --port 8000
 UI:        cd frontend && npm install && npm run dev      (http://localhost:5173)
-In the UI, paste a tenant id and an operator user id from above.
+Worker:    cd backend && python3 -m pulse.cli serve --simulate-present      (the unattended agent)
 MSG
-if [ "${SERVE:-0}" = 1 ]; then
-  exec uvicorn pulse.api.main:app --port 8000
-fi

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from datetime import datetime
@@ -20,6 +21,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+from pulse.auth.passwords import validate_password
 from pulse.config import SystemClock
 from pulse.db.session import owner_session, tenant_session
 from pulse.ingest.dimension import refresh_accounts
@@ -36,11 +38,14 @@ def _tenant_dirs(feeds: Path) -> list[Path]:
 
 def cmd_bootstrap(args) -> int:
     feeds = Path(args.feeds).resolve()
+    demo_password = args.demo_password or os.environ.get("PULSE_DEMO_PASSWORD") or None
+    if demo_password:
+        validate_password(demo_password, "demo@example.test")  # fail loudly, not with a user nobody can sign in as
     for d in _tenant_dirs(feeds):
         with owner_session() as s:
             res = bootstrap_tenant(s, d)
         with tenant_session(res.tenant_id) as s:
-            out = provision_tenant_data(s, res.tenant_id, d)
+            out = provision_tenant_data(s, res.tenant_id, d, demo_password=demo_password)
         print(f"  {out.slug:10s} tenant={res.tenant_id} users={out.users} "
               f"accounts={out.accounts} identity_links={out.identity_links}")
     return 0
@@ -172,6 +177,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(prog="pulse")
     sub = ap.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("bootstrap"); b.add_argument("--feeds", default="../data/feeds")
+    b.add_argument("--demo-password", default=None, help="set this password on users that have none (or PULSE_DEMO_PASSWORD)")
     b.set_defaults(fn=cmd_bootstrap)
     i = sub.add_parser("ingest"); i.add_argument("--feeds", default="../data/feeds")
     i.add_argument("--until", default=None); i.set_defaults(fn=cmd_ingest)

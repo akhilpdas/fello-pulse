@@ -98,7 +98,7 @@ instruction.
 - [X] T036 `backend/pulse/ml/labels.py` — churn-or-contraction labelling from billing corroborated by CRM, per-tenant threshold
 - [X] T037 `backend/pulse/ml/panel.py` — weekly snapshot panel; features as-of each historical Monday, label from the following horizon
 - [X] T038 `backend/pulse/ml/train.py` — `HistGradientBoostingClassifier`, time-based split, isotonic calibration on a held-out block, seeded
-- [X] T039 `backend/pulse/ml/evaluate.py` — PR-AUC, ROC-AUC, Brier, reliability; **precision@capacity and captured-ACV@capacity**; trivial and heuristic baselines; per-tenant and leave-one-tenant-out; lead-time distribution; retrospective fixture check
+- [X] T039 `backend/pulse/ml/evaluate.py` — PR-AUC, ROC-AUC, Brier, reliability; **precision@capacity and captured-ACV@capacity**; trivial and heuristic baselines; per-tenant metrics; retrospective fixture check. **Not delivered by this task, despite the earlier tick:** leave-one-tenant-out (delivered later by 002 T207–T210) and the lead-time distribution (dropped, clarifications B-21). Per-tenant attribution was also wrong until 002 fixed it (B-25)
 - [X] T040 `backend/pulse/ml/registry.py` — versioned artefact, model card, promotion gated on beating the heuristic baseline at the operating point (FR-020)
 - [X] T041 `backend/pulse/ml/explain.py` — TreeSHAP contributions, summed into the six drivers
 - [X] T042 [P] `tests/leakage/test_label_permutation.py` — permuted labels collapse skill to chance (SC-010)
@@ -199,7 +199,7 @@ instruction.
 - [X] T093 `quickstart.md` verified by running it from a clean state
 - [X] T094 `README.md` — decisions, deliberately skipped, what breaks first at 10x
 - [X] T095 Solution brief (one page) and the short deck — `docs/SOLUTION_BRIEF.md`, `docs/DECK.md` (markdown outline; no .pptx rendered)
-- [X] T096 Loom walkthrough script — `docs/LOOM_SCRIPT.md` (script only; the recording itself is not done)
+- [X] T096 Loom walkthrough script — `docs/LOOM_SCRIPT.md` (script only; **no recording exists** — that is the owner's to make)
 - [X] T097 Full suite green; record cycle duration over 5,000 accounts against SC-007
 
 ---
@@ -238,3 +238,17 @@ a foundation that already solves the stated problem.
 constitutional properties — point-in-time correctness, fitted ranking, bounded
 autonomy, tenant isolation, traceability — are each proven in the phase that creates
 them, because a property tested later is a property that was never designed in.
+
+---
+
+## Phase 15: Gaps found by `/speckit-analyze` (2026-10-16)
+
+An analysis of this spec against the delivered code found four MUST requirements with no task and no
+implementation, none written down as dropped (constitution, Delivery Workflow §4). They are tracked in
+`specs/002-production-readiness/tasks.md`; this list exists so this file does not claim more than it did.
+
+- [x] T098 FR-047 mark an account as a false positive, retained as labelled feedback — delivered by 002 T201–T202, T205–T206
+- [x] T099 FR-048 suppress an account from the queue with a reason and expiry — delivered by 002 T203–T206
+- [x] T100 FR-018 leave-one-tenant-out for cold-start tenants — delivered by 002 T207–T210
+- [x] T101 FR-042 users see only the accounts they own — delivered by 002 T232–T233
+

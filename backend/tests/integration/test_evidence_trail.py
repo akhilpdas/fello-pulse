@@ -17,6 +17,7 @@ from pulse.ml.explain import expected_value
 from pulse.ml.panel import PanelRow
 from pulse.ml.train import time_based_split, train
 from pulse.scoring.service import score_and_persist
+from tests.auth_helpers import auth_headers
 
 
 def _toy_model():
@@ -67,7 +68,7 @@ def test_every_persisted_scores_evidence_is_resolvable_to_real_source_records():
     client = TestClient(app)
     detail = client.get(
         f"/accounts/{account_id}", params={"as_of": as_of.isoformat()},
-        headers={"X-Tenant-Id": str(tenant_id)},
+        headers=auth_headers(tenant_id),
     ).json()
 
     assert detail["confidence"] == scored.confidence
@@ -76,7 +77,7 @@ def test_every_persisted_scores_evidence_is_resolvable_to_real_source_records():
 
     evidence_resp = client.get(
         f"/accounts/{account_id}/evidence", params={"event_ids": all_evidence_ids[:5]},
-        headers={"X-Tenant-Id": str(tenant_id)},
+        headers=auth_headers(tenant_id),
     )
     assert evidence_resp.status_code == 200
     events = evidence_resp.json()["events"]

@@ -6,12 +6,15 @@ rather than omitting it."""
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 import pulse.api.deps as deps
 from pulse.api.main import app
+from tests.auth_helpers import auth_headers
+from tests.integration._agent_fixtures import seed_tenant
 
 
 def _card(version: str, promoted: bool, trained_at: str, **metrics_extra) -> dict:
@@ -33,7 +36,8 @@ def _client(tmp_path: Path, cards: list[dict]) -> TestClient:
     for c in cards:
         (tmp_path / f"{c['version']}.json").write_text(json.dumps(c))
     app.dependency_overrides[deps.get_artifacts_dir] = lambda: tmp_path
-    return TestClient(app)
+    tenant_id, _ = seed_tenant(datetime(2026, 10, 1, tzinfo=UTC))
+    return TestClient(app, headers=auth_headers(tenant_id, role="operator"))  # /model is operator-only
 
 
 def teardown_function():
@@ -80,3 +84,17 @@ def test_nan_metric_in_a_slice_is_served_as_null_not_a_500(tmp_path):
     r = _client(tmp_path, [card]).get("/model")
     assert r.status_code == 200
     assert r.json()["per_tenant"]["tiny"]["pr_auc"] is None
+
+
+# T209 (001/FR-018): leave-one-tenant-out is served, and its absence is stated, not omitted.
+def test_leave_one_tenant_out_is_served_from_the_card(tmp_path):
+    loto = {"northwind": {"n_train": 100, "n_test": 40, "roc_auc": 0.64, "precision_at_capacity": 0.2},
+            "initech": {"n_train": 300, "n_test": 9, "roc_auc": None, "precision_at_capacity": 0.0}}
+    r = _client(tmp_path, [_card("m-1", True, "2026-10-01", leave_one_tenant_out=loto)]).get("/model")
+    assert r.json()["leave_one_tenant_out"] == loto
+
+
+def test_missing_leave_one_tenant_out_is_stated_with_a_reason(tmp_path):
+    r = _client(tmp_path, [_card("m-1", True, "2026-10-01")]).get("/model")
+    section = r.json()["leave_one_tenant_out"]
+    assert section["available"] is False and section["reason"]

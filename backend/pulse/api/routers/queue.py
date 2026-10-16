@@ -14,13 +14,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from pulse.api.deps import get_session
+from pulse.api.deps import get_principal, get_session
+from pulse.api.visibility import visible_clause
+from pulse.auth.principal import Principal
 from pulse.domain.confidence import REMEDIES
 
 router = APIRouter()
 
-_QUEUE_SQL = text(
-    """
+_QUEUE_SQL = """
     WITH scored AS (
         SELECT
             s.account_id, s.as_of, s.tier, s.health_score, s.probability,
@@ -35,19 +36,21 @@ _QUEUE_SQL = text(
     JOIN account a ON a.id = scored.account_id
     WHERE scored.as_of = :as_of
       AND scored.tier <> 'abstain'
+      AND {visible}
       AND scored.account_id NOT IN (
           SELECT account_id FROM suppression
           WHERE tenant_id = :tenant_id AND (expires_at IS NULL OR expires_at > now())
       )
     ORDER BY scored.priority DESC
     """
-)
+
 
 
 @router.get("/queue")
 def get_queue(
     as_of: datetime | None = Query(default=None),
     session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
 ):
     if as_of is None:
         as_of = session.execute(text("SELECT max(as_of) FROM score")).scalar()
@@ -59,7 +62,10 @@ def get_queue(
         text("SELECT weekly_capacity FROM tenant_config WHERE tenant_id = :t"), {"t": tenant_row_id}
     ).scalar() or 10
 
-    rows = session.execute(_QUEUE_SQL, {"tenant_id": tenant_row_id, "as_of": as_of}).mappings().all()
+    visible, vparams = visible_clause(principal)
+    rows = session.execute(
+        text(_QUEUE_SQL.format(visible=visible)), {"tenant_id": tenant_row_id, "as_of": as_of, **vparams}
+    ).mappings().all()
 
     out_rows = []
     for r in rows[:capacity]:
@@ -89,6 +95,7 @@ def get_queue(
 def get_low_confidence(
     as_of: datetime | None = Query(default=None),
     session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
 ):
     """Accounts the system declined to score (SC-012): their own surface, with the
     machine-readable reason and a human remedy, never folded into the ranked queue."""
@@ -96,12 +103,13 @@ def get_low_confidence(
         as_of = session.execute(text("SELECT max(as_of) FROM score")).scalar()
         if as_of is None:
             return {"as_of": None, "rows": []}
+    visible, vparams = visible_clause(principal)
     rows = session.execute(
         text("SELECT s.account_id, a.name, s.abstain_reason, s.value_at_risk_cents"
              " FROM score s JOIN account a ON a.id = s.account_id"
-             " WHERE s.as_of = :as_of AND s.tier = 'abstain'"
+             f" WHERE s.as_of = :as_of AND s.tier = 'abstain' AND {visible}"
              " ORDER BY s.value_at_risk_cents DESC NULLS LAST, a.name"),
-        {"as_of": as_of},
+        {"as_of": as_of, **vparams},
     ).mappings().all()
     return {"as_of": as_of.isoformat(), "rows": [
         {"account_id": str(r["account_id"]), "account_name": r["name"],

@@ -88,9 +88,10 @@
       "problemMatcher": []
     },
     {
-      "label": "Pulse: show demo tenant + user ids (paste into the UI)",
+      "label": "Pulse: show demo sign-ins (workspace, email, password)",
       "type": "shell",
-      "command": "psql -h /tmp -U pulse -d pulse -Atc \"SELECT format('%-10s tenant id: %s   operator user id: %s', t.slug, t.id, u.id) FROM tenant t JOIN app_user u ON u.tenant_id = t.id AND u.role = 'operator' WHERE EXISTS (SELECT 1 FROM ingestion_watermark w WHERE w.tenant_id = t.id) ORDER BY t.slug\"",
+      "command": "psql -h /tmp -U pulse -d pulse -Atc \"SELECT format('workspace %-10s operator %s', t.slug, u.email) FROM tenant t JOIN app_user u ON u.tenant_id = t.id AND u.role = 'operator' WHERE EXISTS (SELECT 1 FROM ingestion_watermark w WHERE w.tenant_id = t.id) ORDER BY t.slug\" && echo \"password: $(cat .demo-credentials.pulse)\" && echo 'CSMs: csm01@<workspace>.example.com (same password) see only their own accounts'",
+      "options": { "cwd": "${workspaceFolder}" },
       "presentation": {
         "panel": "shared",
         "reveal": "always"

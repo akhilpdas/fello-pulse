@@ -60,3 +60,28 @@ End-to-end proof, not a unit test: on a throwaway copy of the demo database `pul
 with a 1-minute interval produced one new `succeeded` run per tenant, one interval after the seeded ones, with
 no human action. The `pulse serve` CLI wrapper itself has no unit test (smoke-run only, as above).
 
+
+## 002 Phase 1 — isolation covers the new tables (T214)
+
+Mutation: `DROP POLICY tenant_isolation ON app_session` on `pulse_test`. Result: 3 tests red
+(`test_no_tenant_scoped_table_lacks_a_policy`, `test_unfiltered_select_returns_no_other_tenant_rows`,
+`test_every_scoped_table_is_visible_to_its_own_tenant`); policy restored, 17 isolation tests green.
+Also: the isolation suite failed on the new tables *before* `two_tenants` seeded rows into them — by design,
+because "zero foreign rows" is vacuous on an empty table.
+
+## 002 Phase 2 — identity (T248)
+
+Each protection was removed on a backup copy and the named tests run; originals restored after (22 green).
+
+| Mutation | Result |
+|---|---|
+| `get_session` trusts `X-Tenant-Id` again | `test_identity_forgery::test_a_forged_tenant_header_changes_nothing` red |
+| ownership filter returns "everything" for everyone | 5 of 5 `test_csm_scoping` tests red |
+| reject believes an `actor_user_id` named in the body | `test_actor_is_principal[POST /actions/{id}/reject]` red |
+
+Also confirmed end to end against the real demo database (curl): no credentials → 401; a forged `X-Tenant-Id` with
+no credentials → 401; wrong password → the same 401 body; operator queue 12 rows (2,490 below the cut); `csm01`
+queue 12 rows (78 below the cut — their own accounts only); CSM on `/admin/config` → 403; cookie POST without
+`X-Requested-With` → 403.
+
+Not verified: the browser login form (no browser run); the per-process login limiter across multiple API instances.

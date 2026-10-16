@@ -197,6 +197,26 @@ def _seed_tenant(s, slug: str) -> dict:
         ),
         {"i": uuid.uuid4(), "t": tid, "a": aid, "s": sid, "u": uid},
     )
+    # 002: the identity, audit and opt-out tables. The isolation suite fails on any tenant-scoped
+    # table with no rows, because "zero foreign rows" is then true trivially.
+    s.execute(
+        text(
+            "INSERT INTO app_session (id, tenant_id, user_id, token_hash, expires_at)"
+            " VALUES (:i,:t,:u,:h, now() + interval '1 day')"
+        ),
+        {"i": uuid.uuid4(), "t": tid, "u": uid, "h": uuid.uuid4().hex + uuid.uuid4().hex},
+    )
+    s.execute(
+        text(
+            "INSERT INTO audit_event (id, tenant_id, actor_user_id, actor_kind, event)"
+            " VALUES (:i,:t,:u,'user','login_ok')"
+        ),
+        {"i": uuid.uuid4(), "t": tid, "u": uid},
+    )
+    s.execute(
+        text("INSERT INTO contact_opt_out (id, tenant_id, email, reason) VALUES (:i,:t,'gone@example.test','asked')"),
+        {"i": uuid.uuid4(), "t": tid},
+    )
     return {"tenant_id": tid, "slug": slug, "account_id": aid, "user_id": uid,
             "score_id": sid, "snapshot_id": fsid, "run_id": runid}
 

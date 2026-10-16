@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -92,8 +93,21 @@ class Settings(BaseSettings):
     # the drafter falls back to deterministic templates and the system is fully
     # functional: degraded prose, identical ranking.
     llm_enabled: bool = False
-    llm_model: str = "claude-sonnet-4-5"
-    llm_api_key: str | None = None
+    llm_model: str = "claude-sonnet-5-5"
+    llm_api_key: SecretStr | None = None
+
+    # Sessions (002 / FR-008). Opaque, DB-backed, revocable.
+    session_hours: int = 12
+    cookie_secure: bool = False  # set true behind https
+    login_max_failures: int = 5
+    login_window_seconds: int = 300
+
+    # Outbound mail (002 / FR-013, FR-021). Credentials are deployment-level, never in the database.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_starttls: bool = True
 
     # Model promotion gate: a candidate must beat the heuristic baseline at the
     # operating point by at least this margin in precision to be promoted.
@@ -101,8 +115,6 @@ class Settings(BaseSettings):
     # A test-block AUC above this is treated as evidence of a broken harness
     # rather than a good model, and fails the build.
     auc_plausibility_ceiling: float = 0.95
-
-    auth_secret: str = "dev-only-not-a-real-secret"
 
     paths_feeds: str = "data/feeds"
     paths_artifacts: str = "artifacts"

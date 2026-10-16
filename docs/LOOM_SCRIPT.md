@@ -6,7 +6,7 @@ So this ranks, explains, and drafts — and a human sends."
 **0:30 — One command (30s).** Terminal: `bash infra/scripts/run_all.sh` (show the end: ready, tenant/operator ids).
 Say it went from an empty database to scored, and that it is idempotent.
 
-**1:00 — Monday queue (60s).** UI → paste tenant + operator id → Queue. Point at: bounded list, "why" column,
+**1:00 — Monday queue (60s).** UI → sign in as the Northwind operator → Queue (then sign in as csm01 to show they see only their own accounts). Point at: bounded list, "why" column,
 value at risk, renewal distance, delta since last cycle, "N more below the cut".
 
 **2:00 — Trust it (75s).** Click the top account. Driver bars → expand Evidence → open a Zendesk payload.

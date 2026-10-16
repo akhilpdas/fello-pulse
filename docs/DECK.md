@@ -22,7 +22,7 @@ Drafts by default. Auto-send: per tenant, per play, opt-in, suppression + rate l
 Point-in-time · model ranks/LLM writes · reviewed boundary · tenant isolation (RLS, mutation-verified) · explained outputs.
 
 ## 8. Does the model earn its place?
-Precision@100 0.33 vs 0.02 baseline; AUC 0.69; promotion is gated on beating the baseline at the operating point.
+Precision@100 0.20 vs 0.02 baseline (~9×); AUC 0.68; promotion is gated on beating the baseline at the operating point.
 
 ## 9. What we are honest about
 Two planted lost-renewal accounts not flagged → lead time not claimed. Diagnosed, documented (B-15).

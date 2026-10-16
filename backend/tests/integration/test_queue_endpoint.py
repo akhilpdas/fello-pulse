@@ -16,6 +16,7 @@ from pulse.db.session import owner_session, tenant_session
 from pulse.ml.panel import PanelRow
 from pulse.ml.train import time_based_split, train
 from pulse.scoring.service import score_and_persist
+from tests.auth_helpers import auth_headers
 
 
 def _toy_model():
@@ -62,7 +63,7 @@ def test_queue_endpoint_returns_a_bounded_ordered_queue_with_required_fields():
     client = TestClient(app)
     resp = client.get(
         "/queue", params={"as_of": as_of.isoformat()},
-        headers={"X-Tenant-Id": str(tenant_id)},
+        headers=auth_headers(tenant_id),
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -76,11 +77,10 @@ def test_queue_endpoint_returns_a_bounded_ordered_queue_with_required_fields():
             assert field in row
 
 
-def test_queue_endpoint_rejects_an_unknown_tenant_cleanly():
+def test_queue_endpoint_rejects_a_token_for_an_unknown_tenant_cleanly():
     client = TestClient(app)
     resp = client.get(
         "/queue", params={"as_of": "2026-01-01T00:00:00Z"},
-        headers={"X-Tenant-Id": str(uuid.uuid4())},
+        headers={"Authorization": f"Bearer {uuid.uuid4()}.some-secret"},
     )
-    assert resp.status_code == 200
-    assert resp.json()["rows"] == []
+    assert resp.status_code == 401

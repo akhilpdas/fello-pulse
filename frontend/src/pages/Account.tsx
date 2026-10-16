@@ -1,5 +1,6 @@
 import { useParams } from "react-router-dom";
 import { DriverBars } from "../components/DriverBar";
+import { AccountActions } from "../components/AccountActions";
 import { EvidenceTrail } from "../components/EvidenceTrail";
 import { ScoreDiffView } from "../components/ScoreDiff";
 import { Status } from "../components/Status";
@@ -27,6 +28,7 @@ export function AccountPage() {
       <EvidenceTrail accountId={a.account_id} evidence={a.evidence} />
       <h2>What moved</h2>
       <ScoreDiffView accountId={a.account_id} currentAsOf={a.as_of} />
+      <AccountActions accountId={a.account_id} />
       <h2>Feature values</h2>
       <details><summary>{features.length} features ({a.days_of_history} days of history)</summary>
         <table><tbody>

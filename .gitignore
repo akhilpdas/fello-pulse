@@ -13,3 +13,4 @@ artifacts/
 _snapshot.tar.gz
 .DS_Store
 pulse-sync.bundle
+.demo-credentials*

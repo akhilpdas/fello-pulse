@@ -18,6 +18,7 @@ import pulse.api.deps as deps
 from pulse.agent.transport import RecordingTransport
 from pulse.api.main import app
 from pulse.db.session import owner_session
+from tests.auth_helpers import auth_headers
 
 AS_OF = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 
@@ -42,10 +43,10 @@ def _seed_minimal_action(state: str = "drafted") -> tuple[uuid.UUID, uuid.UUID]:
         s.execute(
             text(
                 "INSERT INTO account (id, tenant_id, external_ref, name, signup_date,"
-                " lifecycle_state, created_at) VALUES (:i,:t,:r,:n,:sd,'active', now())"
+                " lifecycle_state, owner_user_id, created_at) VALUES (:i,:t,:r,:n,:sd,'active', :u, now())"
             ),
             {"i": account_id, "t": tenant_id, "r": "acct-1", "n": "Acme",
-             "sd": AS_OF.date()},
+             "sd": AS_OF.date(), "u": user_id},  # Dana owns the account she acts on
         )
         s.execute(
             text(
@@ -64,13 +65,13 @@ def client():
     return TestClient(app)
 
 
-def _headers(tenant_id):
-    return {"X-Tenant-Id": str(tenant_id)}
+def _headers(tenant_id, user_id=None):
+    return auth_headers(tenant_id, user_id)
 
 
 def test_list_actions_returns_the_seeded_row(client):
-    tenant_id, action_id, _user_id = _seed_minimal_action()
-    resp = client.get("/actions", headers=_headers(tenant_id))
+    tenant_id, action_id, user_id = _seed_minimal_action()
+    resp = client.get("/actions", headers=_headers(tenant_id, user_id))
     assert resp.status_code == 200
     ids = [r["id"] for r in resp.json()["rows"]]
     assert str(action_id) in ids
@@ -85,8 +86,8 @@ def test_approve_without_an_allowlisted_transport_override_still_requires_explic
     tenant_id, action_id, user_id = _seed_minimal_action()
     resp = client.post(
         f"/actions/{action_id}/reject",
-        headers=_headers(tenant_id),
-        json={"actor_user_id": str(user_id), "reason": "not relevant right now"},
+        headers=_headers(tenant_id, user_id),
+        json={"reason": "not relevant right now"},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -107,8 +108,8 @@ def test_edit_updates_content_and_records_the_actor_without_changing_state(clien
     tenant_id, action_id, user_id = _seed_minimal_action()
     resp = client.patch(
         f"/actions/{action_id}",
-        headers=_headers(tenant_id),
-        json={"actor_user_id": str(user_id), "subject": "New subject", "body": "New body"},
+        headers=_headers(tenant_id, user_id),
+        json={"subject": "New subject", "body": "New body"},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -122,8 +123,8 @@ def test_edit_is_rejected_once_a_decision_has_already_been_made(client):
     tenant_id, action_id, user_id = _seed_minimal_action(state="rejected")
     resp = client.patch(
         f"/actions/{action_id}",
-        headers=_headers(tenant_id),
-        json={"actor_user_id": str(user_id), "subject": "too late"},
+        headers=_headers(tenant_id, user_id),
+        json={"subject": "too late"},
     )
     assert resp.status_code == 409
 
@@ -135,8 +136,8 @@ def test_approve_sends_successfully_via_the_configured_transport(client):
     try:
         resp = client.post(
             f"/actions/{action_id}/approve",
-            headers=_headers(tenant_id),
-            json={"actor_user_id": str(user_id)},
+            headers=_headers(tenant_id, user_id),
+            json={},
         )
     finally:
         app.dependency_overrides.pop(deps.get_transport, None)
@@ -155,8 +156,8 @@ def test_approve_retries_a_failing_transport_a_bounded_number_of_times_then_surf
     try:
         resp = client.post(
             f"/actions/{action_id}/approve",
-            headers=_headers(tenant_id),
-            json={"actor_user_id": str(user_id)},
+            headers=_headers(tenant_id, user_id),
+            json={},
         )
     finally:
         app.dependency_overrides.pop(deps.get_transport, None)
@@ -181,8 +182,8 @@ def test_approve_recovers_if_the_transport_succeeds_within_the_retry_budget(clie
     try:
         resp = client.post(
             f"/actions/{action_id}/approve",
-            headers=_headers(tenant_id),
-            json={"actor_user_id": str(user_id)},
+            headers=_headers(tenant_id, user_id),
+            json={},
         )
     finally:
         app.dependency_overrides.pop(deps.get_transport, None)

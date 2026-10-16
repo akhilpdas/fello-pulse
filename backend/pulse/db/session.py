@@ -90,6 +90,24 @@ def tenant_session(tenant_id: uuid.UUID | str) -> Iterator[Session]:
 
 
 @contextmanager
+def public_session() -> Iterator[Session]:
+    """The application role with **no** tenant claim: it can read only the global ``tenant`` table
+    (workspace slug -> id, needed before anyone is signed in). Every tenant-scoped table returns zero
+    rows to it, because the row-level-security claim is NULL -- it fails closed."""
+    factory = sessionmaker(bind=_engine("app"), expire_on_commit=False, future=True)
+    session = factory()
+    try:
+        session.begin()
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+@contextmanager
 def elevated_session() -> Iterator[Session]:
     """Cross-tenant reads. Model training only — never a request.
 

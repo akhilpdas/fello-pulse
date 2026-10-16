@@ -124,6 +124,29 @@ def per_tenant_metrics(tenant_ids: list, y_true, y_prob) -> list[TenantMetrics]:
     return out
 
 
+def leave_one_tenant_out(
+    rows: list, tenants: list, *, cutoff, train_fn, predict_fn, capacity: int,
+) -> dict:
+    """Cold-start performance (001/FR-018): for each tenant, fit on the *other* tenants' rows from
+    before ``cutoff`` and score this tenant's rows from ``cutoff`` on. Pure -- the caller supplies
+    how to fit and predict -- so it is testable without a database and cannot train on the future.
+    A tenant whose held-out block has a single class reports ``None`` for AUC, never 0."""
+    out = {}
+    for held in sorted(set(tenants)):
+        train_rows = [r for r, t in zip(rows, tenants, strict=True) if t != held and r.as_of < cutoff]
+        held_rows = [r for r, t in zip(rows, tenants, strict=True) if t == held and r.as_of >= cutoff]
+        entry = {"n_train": len(train_rows), "n_test": len(held_rows), "roc_auc": None,
+                 "precision_at_capacity": None}
+        if train_rows and held_rows:
+            scores = predict_fn(train_fn(train_rows), held_rows)
+            y = [bool(r.label) for r in held_rows]
+            if len(set(y)) == 2:
+                entry["roc_auc"] = roc_auc(y, scores)
+            entry["precision_at_capacity"] = precision_at_capacity(y, scores, min(capacity, len(y)))
+        out[held] = entry
+    return out
+
+
 class ImplausiblePerformance(AssertionError):
     """Raised when a backtest AUC exceeds the plausibility ceiling -- evidence
     of a broken harness (leakage), not a good model (settings.auc_plausibility_ceiling)."""

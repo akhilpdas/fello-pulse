@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/queue": {
         parameters: {
             query?: never;
@@ -278,6 +329,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{account_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Feedback */
+        post: operations["post_feedback_accounts__account_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{account_id}/suppress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suppress Account */
+        post: operations["suppress_account_accounts__account_id__suppress_post"];
+        /**
+         * Lift Suppression
+         * @description Ends every active suppression now. The rows are kept (expiry set to now), not deleted.
+         */
+        delete: operations["lift_suppression_accounts__account_id__suppress_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Users */
+        get: operations["list_users_admin_users_get"];
+        put?: never;
+        /** Create User */
+        post: operations["create_user_admin_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch User */
+        patch: operations["patch_user_admin_users__user_id__patch"];
+        trace?: never;
+    };
+    "/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Audit */
+        get: operations["get_audit_admin_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Assign Owner */
+        patch: operations["assign_owner_admin_accounts__account_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -288,13 +446,7 @@ export interface components {
             auto_send: boolean;
         };
         /** ApproveRequest */
-        ApproveRequest: {
-            /**
-             * Actor User Id
-             * Format: uuid
-             */
-            actor_user_id: string;
-        };
+        ApproveRequest: Record<string, never>;
         /** ConfigPatch */
         ConfigPatch: {
             /** Horizon Days */
@@ -320,30 +472,79 @@ export interface components {
         };
         /** EditRequest */
         EditRequest: {
-            /**
-             * Actor User Id
-             * Format: uuid
-             */
-            actor_user_id: string;
             /** Subject */
             subject?: string | null;
             /** Body */
             body?: string | null;
+        };
+        /** FeedbackRequest */
+        FeedbackRequest: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "false_positive" | "true_positive" | "not_actionable";
+            /** Note */
+            note?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** LoginRequest */
+        LoginRequest: {
+            /** Workspace */
+            workspace: string;
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+        };
+        /** OwnerPatch */
+        OwnerPatch: {
+            /** Owner User Id */
+            owner_user_id: string | null;
+        };
         /** RejectRequest */
         RejectRequest: {
-            /**
-             * Actor User Id
-             * Format: uuid
-             */
-            actor_user_id: string;
             /** Reason */
             reason?: string | null;
+        };
+        /** SuppressRequest */
+        SuppressRequest: {
+            /** Reason */
+            reason: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /** UserCreate */
+        UserCreate: {
+            /** Email */
+            email: string;
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "csm" | "operator";
+            /** Password */
+            password: string;
+        };
+        /** UserPatch */
+        UserPatch: {
+            /** Name */
+            name?: string | null;
+            /** Role */
+            role?: ("csm" | "operator") | null;
+            /** Disabled */
+            disabled?: boolean | null;
+            /** Password */
+            password?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -367,14 +568,85 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    me_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    logout_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     get_queue_queue_get: {
         parameters: {
             query?: {
                 as_of?: string | null;
             };
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -405,9 +677,7 @@ export interface operations {
             query?: {
                 as_of?: string | null;
             };
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -438,9 +708,7 @@ export interface operations {
             query?: {
                 as_of?: string | null;
             };
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path: {
                 account_id: string;
             };
@@ -473,9 +741,7 @@ export interface operations {
             query: {
                 event_ids: number[];
             };
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path: {
                 account_id: string;
             };
@@ -509,9 +775,7 @@ export interface operations {
                 from_as_of: string;
                 to_as_of: string;
             };
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path: {
                 account_id: string;
             };
@@ -544,9 +808,7 @@ export interface operations {
             query?: {
                 state?: string | null;
             };
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -575,9 +837,7 @@ export interface operations {
     approve_action_actions__action_id__approve_post: {
         parameters: {
             query?: never;
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path: {
                 action_id: string;
             };
@@ -612,9 +872,7 @@ export interface operations {
     reject_action_actions__action_id__reject_post: {
         parameters: {
             query?: never;
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path: {
                 action_id: string;
             };
@@ -649,9 +907,7 @@ export interface operations {
     edit_action_actions__action_id__patch: {
         parameters: {
             query?: never;
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path: {
                 action_id: string;
             };
@@ -686,10 +942,7 @@ export interface operations {
     get_config_admin_config_get: {
         parameters: {
             query?: never;
-            header: {
-                "x-user-id": string;
-                "x-tenant-id": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -704,24 +957,12 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
         };
     };
     patch_config_admin_config_patch: {
         parameters: {
             query?: never;
-            header: {
-                "x-user-id": string;
-                "x-tenant-id": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -754,10 +995,7 @@ export interface operations {
     get_allowlist_admin_allowlist_get: {
         parameters: {
             query?: never;
-            header: {
-                "x-user-id": string;
-                "x-tenant-id": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -772,24 +1010,12 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
         };
     };
     put_allowlist_admin_allowlist__play_key__put: {
         parameters: {
             query?: never;
-            header: {
-                "x-user-id": string;
-                "x-tenant-id": string;
-            };
+            header?: never;
             path: {
                 play_key: string;
             };
@@ -824,10 +1050,7 @@ export interface operations {
     get_coverage_admin_coverage_get: {
         parameters: {
             query?: never;
-            header: {
-                "x-user-id": string;
-                "x-tenant-id": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -840,15 +1063,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -878,13 +1092,255 @@ export interface operations {
             query?: {
                 limit?: number;
             };
-            header: {
-                "x-tenant-id": string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_feedback_accounts__account_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suppress_account_accounts__account_id__suppress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuppressRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lift_suppression_accounts__account_id__suppress_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    create_user_admin_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_user_admin_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_audit_admin_audit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    assign_owner_admin_accounts__account_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerPatch"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

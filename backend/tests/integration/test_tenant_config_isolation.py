@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from pulse.api.main import app
 from pulse.db.session import owner_session
+from tests.auth_helpers import auth_headers
 
 
 def _seed_tenant(role_of_user: str = "operator") -> tuple[uuid.UUID, uuid.UUID]:
@@ -27,7 +28,7 @@ def _seed_tenant(role_of_user: str = "operator") -> tuple[uuid.UUID, uuid.UUID]:
 
 
 def _h(tenant_id, user_id) -> dict:
-    return {"X-Tenant-Id": str(tenant_id), "X-User-Id": str(user_id)}
+    return auth_headers(tenant_id, user_id)
 
 
 def test_non_operator_cannot_change_config():

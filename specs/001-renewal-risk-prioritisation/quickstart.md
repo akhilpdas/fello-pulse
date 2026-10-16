@@ -21,7 +21,7 @@ Options: `PULSE_DB_NAME=other` builds a differently named database (the API then
 
 `Terminal ▸ Run Task…` — the tasks in `.vscode/tasks.json` are numbered:
 **1. start Postgres** → **2. build demo data** → **3. run the demo (API + UI)**, then
-**show demo tenant + user ids** and paste them into http://localhost:5173.
+**show demo sign-ins**, then sign in at http://localhost:5173 (workspace, email, password).
 **RESET demo database** drops `pulse` if you want to start over.
 
 **4. unattended worker** is the agent itself: `python3 -m pulse.cli serve --simulate-present`.
@@ -38,8 +38,9 @@ cd backend && source .venv/bin/activate && uvicorn pulse.api.main:app --port 800
 cd frontend && npm install && npm run dev        # http://localhost:5173
 ```
 
-Paste a **tenant id** and **operator user id** (printed by `run_all.sh`) into the bar at
-the top. Queue, Low confidence, Drafts (approve/reject/edit) and Run log are the four
+Sign in with a workspace (the tenant name), an email and the demo password (printed by `run_all.sh`, kept in the
+git-ignored `.demo-credentials.pulse`). An **operator** (`csm00@<workspace>.example.com`) sees the whole tenant; a **CSM**
+(`csm01@…`) sees only their own accounts. Queue, Low confidence, Drafts (approve/reject/edit) and Run log are the four
 views; click an account for drivers, evidence down to source payloads, and score diff.
 
 ## Two databases, on purpose

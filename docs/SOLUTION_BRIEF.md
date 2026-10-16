@@ -22,8 +22,8 @@ last week, and the evidence down to the source payload.
 writes (system runs with it off) · autonomy bounded and every refusal recorded · tenant isolation
 enforced in Postgres, mutation-tested · every number traces to evidence.
 
-**Results (seed-reproducible).** Precision@100 **0.33** vs 0.02 for the heuristic baseline;
-ROC-AUC **0.69**; a full cycle over ~4,500 accounts in ~105 s against a 15-minute interval.
+**Results (seed-reproducible).** Precision@100 **0.20** vs 0.02 for the heuristic baseline;
+ROC-AUC **0.68**; a full cycle over ~4,500 accounts in ~105 s against a 15-minute interval.
 
 **What is not done.** The two planted "lost renewal" accounts are *not* flagged by the model, so we
 cannot yet claim lead time; the shortfall is diagnosed (response-time vs ticket-volume attribution) and

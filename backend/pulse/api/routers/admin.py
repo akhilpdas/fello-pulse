@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from pulse.agent.plays import PLAYS
-from pulse.api.deps import get_session
+from pulse.api.deps import get_session, require_operator
 
 router = APIRouter(prefix="/admin")
 
@@ -42,16 +42,6 @@ class ConfigPatch(BaseModel):
 
 class AllowlistPut(BaseModel):
     auto_send: bool
-
-
-def require_operator(
-    x_user_id: str = Header(...), session: Session = Depends(get_session)
-) -> uuid.UUID:
-    user_id = uuid.UUID(x_user_id)
-    role = session.execute(text("SELECT role FROM app_user WHERE id = :i"), {"i": user_id}).scalar()
-    if role != "operator":
-        raise HTTPException(status_code=403, detail="operator role required")
-    return user_id
 
 
 def _config(session: Session) -> dict:

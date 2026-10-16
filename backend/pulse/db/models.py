@@ -106,6 +106,23 @@ class TenantConfig(TenantScoped, Base):
         server_default=text("ARRAY['salesforce','gmail','zendesk','product','stripe']::text[]"),
     )
 
+    # Outbound email (002). Safe by default: nothing leaves until an operator turns it on, and a
+    # database built by the generator stays in demo mode (every message redirected to a test inbox).
+    outbound_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    sender_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sender_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    demo_mode: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+    test_inbox: Mapped[str | None] = mapped_column(Text, nullable=True)
+    llm_calls_per_cycle: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=50, server_default=text("50")
+    )
+
     __table_args__ = (UniqueConstraint("tenant_id", name="uq_tenant_config_tenant"),)
 
 
@@ -118,6 +135,11 @@ class AppUser(TenantScoped, Base):
     role: Mapped[str] = mapped_column(
         String(16), nullable=False, default="csm", server_default=text("'csm'")
     )
+
+    # Credential (002 / FR-007): scrypt hash with its parameters embedded. NULL = cannot sign in.
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_app_user_email"),)
 
@@ -152,6 +174,10 @@ class Account(TenantScoped, Base):
     owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="SET NULL"), nullable=True
     )
+    # Who to write to (002 / FR-015). Never read by features/; NULL means "no known contact" and
+    # is never replaced by a placeholder.
+    contact_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    contact_email: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # --- outcome columns: denied to the feature layer (features/denylist.py) ---
     lifecycle_state: Mapped[str] = mapped_column(
@@ -476,11 +502,75 @@ class Action(TenantScoped, Base):
     attempts: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
     )
+    # Delivery and draft provenance (002)
+    redirected_to: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider_message_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivery_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    original_subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    original_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    draft_model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    draft_fallback_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index("ix_action_account", "tenant_id", "account_id", "created_at"),
         Index("ix_action_state", "tenant_id", "state"),
     )
+
+
+class AppSession(TenantScoped, Base):
+    """A signed-in user's session (002 / FR-008). Only the SHA-256 of the secret is stored; the
+    token the client holds is ``<tenant_id>.<secret>`` and is looked up under that tenant's claim, so
+    a forged prefix finds nothing."""
+
+    __tablename__ = "app_session"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    created_at: Mapped[datetime] = ts(server_now=True)
+    expires_at: Mapped[datetime] = ts()
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_app_session_lookup", "tenant_id", "token_hash"),)
+
+
+class AuditEvent(TenantScoped, Base):
+    """Who or what did what (002 / FR-012). Append-only: the application role may INSERT and SELECT
+    but not UPDATE or DELETE."""
+
+    __tablename__ = "audit_event"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    at: Mapped[datetime] = ts(server_now=True)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="SET NULL"), nullable=True
+    )
+    actor_kind: Mapped[str] = mapped_column(String(16), nullable=False)  # user | system | anonymous
+    event: Mapped[str] = mapped_column(String(48), nullable=False)
+    subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    detail: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+
+    __table_args__ = (Index("ix_audit_event_at", "tenant_id", "at"),)
+
+
+class ContactOptOut(TenantScoped, Base):
+    """A recipient who must not be sent to again (002 / FR-016)."""
+
+    __tablename__ = "contact_opt_out"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = ts(server_now=True)
+
+    __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_contact_opt_out_email"),)
 
 
 class WorkLease(Base):
@@ -576,7 +666,7 @@ from pulse.db.base import TENANT_SCOPED_TABLES  # noqa: E402
 GLOBAL_TABLES = ["tenant", "model_version", "work_lease"]
 
 __all__ = [
-    "Account", "Action", "AgentRun", "AppUser", "Base", "Feedback", "FeatureSnapshot",
+    "Account", "Action", "AgentRun", "AppSession", "AppUser", "AuditEvent", "Base", "ContactOptOut", "Feedback", "FeatureSnapshot",
     "GLOBAL_TABLES", "IdentityLink", "IngestionWatermark", "ModelVersion", "PlayAllowlist",
     "Score", "SourceEvent", "Suppression", "TENANT_SCOPED_TABLES", "Tenant", "TenantConfig",
     "WorkLease",

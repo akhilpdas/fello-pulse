@@ -490,6 +490,39 @@ purpose: three years of weekly usage rollups dominate), five sources, 9,252 even
 occurred, 10,930 (3%) with an unresolved identity, 94 accounts with <5 events. The generated data's present
 (2026-11-10) is later than the machine's wall clock (2026-10-16); that is why the worker has `--simulate-present`.
 
-**Still not done, and not hidden:** SC-005/SC-006 (AUC 0.69; the two planted accounts are not flagged; no lead
+**Still not done, and not hidden:** SC-005/SC-006 (AUC 0.68; the two planted accounts are not flagged; no lead
 time); no real-browser run of the UI; the Loom is a script, not a recording; no hosted/"live" URL — it runs locally;
 no auth layer; nothing pushed to GitHub until the owner says so.
+
+---
+
+## Status as of 2026-10-16 (spec 002 — Phase 0, Phase 1 and Phase 2 / US1 complete: the MVP checkpoint)
+
+Specification, plan, research, data model, contracts, quickstart and 104 tasks are in `specs/002-production-readiness/`.
+Work is strictly test-first; `tasks.md` is ticked as it goes. **Backend 301 passed, frontend 21 passed, build clean.**
+
+**Done**
+- **Phase 0 — gaps spec 001 promised and never built** (found by `/speckit-analyze`): false-positive feedback
+  (`POST /accounts/{id}/feedback`), suppress-with-expiry (`POST/DELETE /accounts/{id}/suppress`), leave-one-tenant-out in
+  the model card and `GET /model`, UI actions on the account page. 001's `tasks.md` corrected (T039, T096, Phase 15).
+- **Bugs found on the way, fixed with tests:** per-tenant model metrics were attributed to the wrong tenants
+  (every card said northwind = 13,086 rows); the LLM key printed in `repr(Settings)`; a dead hard-coded `auth_secret`.
+- **Phase 1 — schema:** migration `0005` (credentials, contacts, outbound settings, delivery/provenance columns, `app_session`,
+  `audit_event` (append-only), `contact_opt_out`) with FORCEd RLS; isolation suite seeds and covers the new tables; mutation-checked.
+- **Phase 2 — identity (US1):** scrypt passwords + policy; opaque revocable sessions (`<tenant>.<secret>`, looked up *under* RLS, no
+  `SECURITY DEFINER`); login limiter; `/auth/login|me|logout`; **headers are no longer trusted anywhere**; every route requires a
+  session (swept from the OpenAPI schema); operator-only routes enforced server-side; CSMs see only their own accounts (404 otherwise);
+  the approver is the session user, never the body; disabled/demoted users lose access on the next request; operator user and
+  ownership management; audit trail; worker actions attributed to the system; CSRF header for cookie writes; sign-in screen replaces
+  the paste-ids bar; demo users have passwords (generated, `.demo-credentials.pulse`, git-ignored, mode 600). Mutation-verified (3).
+  Smoke-tested with curl against the real demo database.
+
+**Corrected numbers.** The README/brief/deck figure of precision@100 0.33 / AUC 0.69 was stale; the reproducible figure is
+**0.196 vs 0.021 (~9×), AUC 0.684** (clarifications B-25). Cold-start (leave-one-tenant-out): globex AUC 0.72, northwind 0.67,
+**initech 0.575 / precision 0.06** — the shared model barely helps a small new tenant.
+
+**Not done yet (Phases 3–6):** real email (SMTP transport, send gate, demo-mode redirect, opt-out), live LLM drafting with grounding
+validation, container files (unverified — Docker is not installed), re-quoting every metric after the contact-field data change, README
+"skipped" split, re-run `/speckit-analyze`. **Not verified:** the new sign-in screen and account-action buttons have not been driven in
+a browser; there is no operator UI (user/audit/outbound management is API only); login rate limiting is per-process.
+Nothing from this session is committed.

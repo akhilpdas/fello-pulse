@@ -12,7 +12,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from pulse.api.deps import get_session
+from pulse.api.deps import get_principal, get_session
+from pulse.api.visibility import require_visible_account
+from pulse.auth.principal import Principal
 from pulse.ml.explain import driver_contributions
 
 router = APIRouter()
@@ -43,7 +45,9 @@ def get_account(
     account_id: uuid.UUID,
     as_of: datetime | None = Query(default=None),
     session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
 ):
+    require_visible_account(session, principal, account_id)
     if as_of is None:
         as_of = _latest_as_of_for_account(session, account_id)
         if as_of is None:
@@ -85,9 +89,11 @@ def get_evidence(
     account_id: uuid.UUID,
     event_ids: list[int] = Query(...),
     session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
 ):
     """Resolve evidence ids to the original source records. Scoped to the
     account so one account's evidence can never be used to pull another's."""
+    require_visible_account(session, principal, account_id)
     rows = session.execute(
         text(
             "SELECT id, source, event_type, occurred_at, received_at, payload"
@@ -114,10 +120,12 @@ def score_diff(
     from_as_of: datetime = Query(...),
     to_as_of: datetime = Query(...),
     session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
 ):
     """Feature-level diff between two scores, with the per-feature
     contribution change -- "why did this move," answerable without a data
     pull (FR-027)."""
+    require_visible_account(session, principal, account_id)
     from_row = _score_row(session, account_id, from_as_of)
     to_row = _score_row(session, account_id, to_as_of)
     if from_row is None or to_row is None:

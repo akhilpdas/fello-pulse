@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy import text
@@ -26,6 +27,7 @@ from pulse.ml.evaluate import (
     captured_acv_at_capacity,
     check_plausibility,
     heuristic_baseline_score,
+    leave_one_tenant_out,
     per_tenant_metrics,
     pr_auc,
     precision_at_capacity,
@@ -41,7 +43,7 @@ from pulse.ml.registry import (
     save_artifact,
     write_model_card,
 )
-from pulse.ml.train import predict_proba, time_based_split, train
+from pulse.ml.train import Split, predict_proba, time_based_split, train
 
 
 def trainable_tenants(session) -> list[tuple]:
@@ -53,6 +55,30 @@ def trainable_tenants(session) -> list[tuple]:
              " (SELECT 1 FROM ingestion_watermark w WHERE w.tenant_id = tenant.id)"
              " ORDER BY slug")
     ).all())
+
+
+@dataclass(frozen=True, slots=True)
+class TenantBlocks:
+    """The tenant of every row in each split block, aligned row-for-row with ``Split``."""
+
+    train: list[str]
+    val: list[str]
+    calib: list[str]
+    test: list[str]
+
+
+def split_with_tenants(rows: list[PanelRow], tenants: list[str], **fractions) -> tuple[Split, TenantBlocks]:
+    """``time_based_split`` that carries each row's tenant through the sort. Pairing the
+    time-sorted test block with the tenant-ordered slug list (as this module once did) attributes
+    rows to the wrong tenants."""
+    order = sorted(range(len(rows)), key=lambda i: rows[i].as_of)
+    split = time_based_split([rows[i] for i in order], **fractions)
+    ordered_tenants = [tenants[i] for i in order]
+    a, b, c = len(split.train), len(split.val), len(split.calib)
+    return split, TenantBlocks(
+        train=ordered_tenants[:a], val=ordered_tenants[a:a + b],
+        calib=ordered_tenants[a + b:a + b + c], test=ordered_tenants[a + b + c:],
+    )
 
 
 def build_full_panel(clock: Clock, horizon_days: int) -> tuple[list[PanelRow], list[str]]:
@@ -107,7 +133,7 @@ def run(clock: Clock | None = None, out_dir: Path = Path("../artifacts")) -> dic
     positive_rate = sum(1 for r in rows if r.label) / len(rows)
     print(f"positive rate: {positive_rate:.4f}")
 
-    split = time_based_split(rows)
+    split, tenant_blocks = split_with_tenants(rows, tenant_slugs)
     model = train(split, seed=settings.model_seed)
     print(f"fitted on {len(split.train)} rows, {len(model.feature_names)} features "
           f"({len(model.dropped_features)} dropped as all-missing in train)")
@@ -141,10 +167,22 @@ def run(clock: Clock | None = None, out_dir: Path = Path("../artifacts")) -> dic
             "precision_at_capacity": precision_at_capacity(y_test, heuristic_scores, capacity),
         },
     }
-    for tm in per_tenant_metrics(tenant_slugs[-len(split.test):], y_test, proba):
+    for tm in per_tenant_metrics(tenant_blocks.test, y_test, proba):
         metrics.setdefault("per_tenant", {})[tm.tenant] = {
             "n": tm.n, "positive_rate": tm.positive_rate, "pr_auc": tm.pr_auc, "roc_auc": tm.roc_auc,
         }
+
+    # Cold start (001/FR-018): fit on the other tenants before the test period, score this one after it.
+    t_loto = time.time()
+    metrics["leave_one_tenant_out"] = leave_one_tenant_out(
+        [*split.train, *split.val, *split.calib, *split.test],
+        [*tenant_blocks.train, *tenant_blocks.val, *tenant_blocks.calib, *tenant_blocks.test],
+        cutoff=split.test[0].as_of,
+        train_fn=lambda r: train(time_based_split(r), seed=settings.model_seed),
+        predict_fn=lambda m, held: predict_proba(m, [x.feature_values for x in held]),
+        capacity=capacity,
+    )
+    metrics["leave_one_tenant_out_seconds"] = round(time.time() - t_loto, 1)
 
     try:
         check_plausibility(metrics["roc_auc"], settings.auc_plausibility_ceiling)

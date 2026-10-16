@@ -31,6 +31,7 @@ from pulse.agent.drafter import validate_grounding
 from pulse.agent.plays import eligible_plays
 from pulse.agent.policy import decide as policy_decide
 from pulse.agent.transport import Transport
+from pulse.auth import audit
 from pulse.domain.change import material_change
 from pulse.ml.train import TrainedModel
 from pulse.scoring.service import score_and_persist
@@ -244,5 +245,8 @@ def run_cycle(
         ),
         {"sc": json.dumps(stage_counts), "dd": json.dumps(declined), "i": run_id},
     )
+
+    # The worker acts as the system, never as a person (FR-010): the cycle is attributed accordingly.
+    audit.record(session, "cycle_run", actor_kind="system", subject=str(run_id), detail=stage_counts)
 
     return CycleResult(run_id=run_id, stage_counts=stage_counts, decisions_declined=declined)

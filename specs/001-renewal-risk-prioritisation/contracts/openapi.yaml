@@ -3,6 +3,48 @@ info:
   title: Pulse
   version: 0.1.0
 paths:
+  /auth/login:
+    post:
+      summary: Login
+      operationId: login_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/me:
+    get:
+      summary: Me
+      operationId: me_auth_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /auth/logout:
+    post:
+      summary: Logout
+      operationId: logout_auth_logout_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
   /queue:
     get:
       summary: Get Queue
@@ -17,12 +59,6 @@ paths:
             format: date-time
           - type: 'null'
           title: As Of
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       responses:
         '200':
           description: Successful Response
@@ -53,12 +89,6 @@ paths:
             format: date-time
           - type: 'null'
           title: As Of
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       responses:
         '200':
           description: Successful Response
@@ -92,12 +122,6 @@ paths:
             format: date-time
           - type: 'null'
           title: As Of
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       responses:
         '200':
           description: Successful Response
@@ -134,12 +158,6 @@ paths:
           items:
             type: integer
           title: Event Ids
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       responses:
         '200':
           description: Successful Response
@@ -183,12 +201,6 @@ paths:
           type: string
           format: date-time
           title: To As Of
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       responses:
         '200':
           description: Successful Response
@@ -214,12 +226,6 @@ paths:
           - type: string
           - type: 'null'
           title: State
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       responses:
         '200':
           description: Successful Response
@@ -244,12 +250,6 @@ paths:
           type: string
           format: uuid
           title: Action Id
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       requestBody:
         required: true
         content:
@@ -280,12 +280,6 @@ paths:
           type: string
           format: uuid
           title: Action Id
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       requestBody:
         required: true
         content:
@@ -316,12 +310,6 @@ paths:
           type: string
           format: uuid
           title: Action Id
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       requestBody:
         required: true
         content:
@@ -344,53 +332,21 @@ paths:
     get:
       summary: Get Config
       operationId: get_config_admin_config_get
-      parameters:
-      - name: x-user-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-User-Id
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema: {}
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
     patch:
       summary: Patch Config
       operationId: patch_config_admin_config_patch
-      parameters:
-      - name: x-user-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-User-Id
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ConfigPatch'
+        required: true
       responses:
         '200':
           description: Successful Response
@@ -407,31 +363,12 @@ paths:
     get:
       summary: Get Allowlist
       operationId: get_allowlist_admin_allowlist_get
-      parameters:
-      - name: x-user-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-User-Id
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema: {}
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /admin/allowlist/{play_key}:
     put:
       summary: Put Allowlist
@@ -443,18 +380,6 @@ paths:
         schema:
           type: string
           title: Play Key
-      - name: x-user-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-User-Id
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       requestBody:
         required: true
         content:
@@ -484,31 +409,12 @@ paths:
 
         absent, which is different from connected-and-silent.'
       operationId: get_coverage_admin_coverage_get
-      parameters:
-      - name: x-user-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-User-Id
-      - name: x-tenant-id
-        in: header
-        required: true
-        schema:
-          type: string
-          title: X-Tenant-Id
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema: {}
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /model:
     get:
       summary: Get Model Report
@@ -533,12 +439,192 @@ paths:
           minimum: 1
           default: 50
           title: Limit
-      - name: x-tenant-id
-        in: header
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /accounts/{account_id}/feedback:
+    post:
+      summary: Post Feedback
+      operationId: post_feedback_accounts__account_id__feedback_post
+      parameters:
+      - name: account_id
+        in: path
         required: true
         schema:
           type: string
-          title: X-Tenant-Id
+          format: uuid
+          title: Account Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /accounts/{account_id}/suppress:
+    post:
+      summary: Suppress Account
+      operationId: suppress_account_accounts__account_id__suppress_post
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Account Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuppressRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      summary: Lift Suppression
+      description: Ends every active suppression now. The rows are kept (expiry set
+        to now), not deleted.
+      operationId: lift_suppression_accounts__account_id__suppress_delete
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Account Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/users:
+    get:
+      summary: List Users
+      operationId: list_users_admin_users_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+    post:
+      summary: Create User
+      operationId: create_user_admin_users_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/users/{user_id}:
+    patch:
+      summary: Patch User
+      operationId: patch_user_admin_users__user_id__patch
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/audit:
+    get:
+      summary: Get Audit
+      operationId: get_audit_admin_audit_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /admin/accounts/{account_id}:
+    patch:
+      summary: Assign Owner
+      operationId: assign_owner_admin_accounts__account_id__patch
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Account Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnerPatch'
       responses:
         '200':
           description: Successful Response
@@ -563,14 +649,8 @@ components:
       - auto_send
       title: AllowlistPut
     ApproveRequest:
-      properties:
-        actor_user_id:
-          type: string
-          format: uuid
-          title: Actor User Id
+      properties: {}
       type: object
-      required:
-      - actor_user_id
       title: ApproveRequest
     ConfigPatch:
       properties:
@@ -629,10 +709,6 @@ components:
       title: ConfigPatch
     EditRequest:
       properties:
-        actor_user_id:
-          type: string
-          format: uuid
-          title: Actor User Id
         subject:
           anyOf:
           - type: string
@@ -644,9 +720,26 @@ components:
           - type: 'null'
           title: Body
       type: object
-      required:
-      - actor_user_id
       title: EditRequest
+    FeedbackRequest:
+      properties:
+        kind:
+          type: string
+          enum:
+          - false_positive
+          - true_positive
+          - not_actionable
+          title: Kind
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      title: FeedbackRequest
     HTTPValidationError:
       properties:
         detail:
@@ -656,21 +749,114 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
+    LoginRequest:
+      properties:
+        workspace:
+          type: string
+          title: Workspace
+        email:
+          type: string
+          title: Email
+        password:
+          type: string
+          title: Password
+      additionalProperties: false
+      type: object
+      required:
+      - workspace
+      - email
+      - password
+      title: LoginRequest
+    OwnerPatch:
+      properties:
+        owner_user_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Owner User Id
+      additionalProperties: false
+      type: object
+      required:
+      - owner_user_id
+      title: OwnerPatch
     RejectRequest:
       properties:
-        actor_user_id:
-          type: string
-          format: uuid
-          title: Actor User Id
         reason:
           anyOf:
           - type: string
           - type: 'null'
           title: Reason
       type: object
-      required:
-      - actor_user_id
       title: RejectRequest
+    SuppressRequest:
+      properties:
+        reason:
+          type: string
+          title: Reason
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+      additionalProperties: false
+      type: object
+      required:
+      - reason
+      - expires_at
+      title: SuppressRequest
+    UserCreate:
+      properties:
+        email:
+          type: string
+          title: Email
+        name:
+          type: string
+          title: Name
+        role:
+          type: string
+          enum:
+          - csm
+          - operator
+          title: Role
+        password:
+          type: string
+          title: Password
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - name
+      - role
+      - password
+      title: UserCreate
+    UserPatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        role:
+          anyOf:
+          - type: string
+            enum:
+            - csm
+            - operator
+          - type: 'null'
+          title: Role
+        disabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Disabled
+        password:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Password
+      additionalProperties: false
+      type: object
+      title: UserPatch
     ValidationError:
       properties:
         loc:

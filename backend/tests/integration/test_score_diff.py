@@ -16,6 +16,7 @@ from pulse.db.session import owner_session, tenant_session
 from pulse.ml.panel import PanelRow
 from pulse.ml.train import time_based_split, train
 from pulse.scoring.service import score_and_persist
+from tests.auth_helpers import auth_headers
 
 
 def _toy_model():
@@ -66,7 +67,7 @@ def test_score_diff_surfaces_the_feature_that_actually_moved():
     resp = client.get(
         f"/accounts/{account_id}/score-diff",
         params={"from_as_of": from_as_of.isoformat(), "to_as_of": to_as_of.isoformat()},
-        headers={"X-Tenant-Id": str(tenant_id)},
+        headers=auth_headers(tenant_id),
     )
     assert resp.status_code == 200
     body = resp.json()

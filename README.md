@@ -6,7 +6,7 @@ and a drafted first move. It runs on its own: ingest → score → detect change
 record, with nothing gated on a person opening a page.
 
 Run it in VS Code: `Terminal ▸ Run Task…` → the numbered `Pulse:` tasks (details in the quickstart).
-Task **4** starts the unattended worker (`python3 -m pulse.cli serve`): a loop that cycles each tenant when
+Sign in with a workspace + email + password (task **show demo sign-ins**); CSMs see only their own accounts, operators the whole tenant — identity comes from a verified session, never from a header. Task **4** starts the unattended worker (`python3 -m pulse.cli serve`): a loop that cycles each tenant when
 it is due, leased so two workers can't double-run a tenant, recording a `failed` run (and carrying on with
 the other tenants) if one tenant's cycle breaks.
 
@@ -54,8 +54,8 @@ OpenAPI contract is guarded by a test that fails if the API changes without rege
 
 Against the spec's success criteria — stated plainly, including the misses:
 
-- **Met:** SC-001/002 (queue and evidence trail), SC-003 (precision@100 0.33 vs 0.02 for the heuristic baseline, seed 7), SC-007 (a full cycle over ~4,500 accounts in about 105 s against a 15-minute interval), SC-008–SC-014.
-- **Not met — SC-005 and SC-006.** ROC-AUC on the held-out block is **0.69**, below the 0.8+ the generator was designed to allow, and the two planted retrospective accounts (the stand-ins for "the two renewals we lost") are **not flagged** at any point in their history. Their individual features do show decline; the support-degradation story is carried by response time while the model leans on ticket volume. This is investigated in `clarifications.md` B-15. I did not tune against the two fixtures, which would be overfitting to the demo. **The lead-time distribution is therefore not reported** (`GET /model` says so rather than omitting it).
+- **Met:** SC-001/002 (queue and evidence trail), SC-003 (precision@100 0.20 vs 0.02 for the heuristic baseline, seed 7), SC-007 (a full cycle over ~4,500 accounts in about 105 s against a 15-minute interval), SC-008–SC-014.
+- **Not met — SC-005 and SC-006.** ROC-AUC on the held-out block is **0.68**, below the 0.8+ the generator was designed to allow, and the two planted retrospective accounts (the stand-ins for "the two renewals we lost") are **not flagged** at any point in their history. Their individual features do show decline; the support-degradation story is carried by response time while the model leans on ticket volume. This is investigated in `clarifications.md` B-15. I did not tune against the two fixtures, which would be overfitting to the demo. **The lead-time distribution is therefore not reported** (`GET /model` says so rather than omitting it).
 - **SC-004 (calibration tolerance)** is reported as a reliability curve; the tolerance check itself is not asserted.
 
 ## Deliberately skipped

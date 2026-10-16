@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from pulse.api.main import app
 from pulse.db.session import owner_session
+from tests.auth_helpers import auth_headers
 from tests.integration._agent_fixtures import seed_account, seed_tenant
 
 AS_OF = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
@@ -24,7 +25,7 @@ def test_coverage_reports_connected_flag_event_counts_and_last_received_per_sour
         s.execute(text("INSERT INTO app_user (id, tenant_id, email, name, role)"
                        " VALUES (:i,:t,'o@example.test','O','operator')"), {"i": op, "t": tenant_id})
     r = TestClient(app).get("/admin/coverage",
-                            headers={"X-Tenant-Id": str(tenant_id), "X-User-Id": str(op)})
+                            headers=auth_headers(tenant_id, op))
     assert r.status_code == 200
     by = {row["source"]: row for row in r.json()}
     assert set(by) == {"salesforce", "gmail", "zendesk", "product", "stripe"}

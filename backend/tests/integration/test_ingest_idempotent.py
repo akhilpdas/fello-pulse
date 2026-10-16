@@ -6,7 +6,6 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from pulse.db.session import owner_session
-
 from tests.integration.conftest import record
 
 TICKETS = [record(f"z{i}", "zd-1", "ticket.created", f"2026-09-0{i}T09:00:00Z", f"2026-09-0{i}T10:00:00Z",

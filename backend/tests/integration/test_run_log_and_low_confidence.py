@@ -14,13 +14,14 @@ from sqlalchemy import text
 from pulse.api.main import app
 from pulse.db.session import owner_session, tenant_session
 from pulse.scoring.service import score_and_persist
+from tests.auth_helpers import auth_headers
 from tests.integration._agent_fixtures import seed_account, seed_tenant, toy_support_model
 
 AS_OF = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 
 
 def _h(tenant_id) -> dict:
-    return {"X-Tenant-Id": str(tenant_id)}
+    return auth_headers(tenant_id)
 
 
 def test_run_log_lists_cycles_newest_first_with_stage_counts_and_declined_decisions():

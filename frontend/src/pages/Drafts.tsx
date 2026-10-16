@@ -7,11 +7,10 @@ import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
 
 function Draft({ a, onChanged }: { a: Action; onChanged: () => void }) {
-  const { api, session } = useSession();
+  const { api } = useSession();
   const [body, setBody] = useState(a.body);
   const [subject, setSubject] = useState(a.subject ?? "");
   const [err, setErr] = useState<string | null>(null);
-  const actor = session.userId;
   const editable = a.state === "drafted";
 
   async function run(fn: () => Promise<unknown>) {
@@ -38,10 +37,9 @@ function Draft({ a, onChanged }: { a: Action; onChanged: () => void }) {
       </div>
       {editable && (
         <footer>
-          <button disabled={!actor} onClick={() => run(() => api.patch(`/actions/${a.id}`, { actor_user_id: actor, subject, body }))}>Save edit</button>{" "}
-          <button disabled={!actor} onClick={() => run(() => api.post(`/actions/${a.id}/approve`, { actor_user_id: actor }))}>Approve & send</button>{" "}
-          <button disabled={!actor} onClick={() => run(() => api.post(`/actions/${a.id}/reject`, { actor_user_id: actor }))}>Reject</button>
-          {!actor && <span className="muted"> Set your user id above to decide.</span>}
+          <button onClick={() => run(() => api.patch(`/actions/${a.id}`, { subject, body }))}>Save edit</button>{" "}
+          <button onClick={() => run(() => api.post(`/actions/${a.id}/approve`, {}))}>Approve & send</button>{" "}
+          <button onClick={() => run(() => api.post(`/actions/${a.id}/reject`, {}))}>Reject</button>
         </footer>
       )}
       {err && <p className="error" role="alert">{err}</p>}

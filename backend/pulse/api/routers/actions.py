@@ -19,24 +19,26 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from pulse.agent.transport import Transport, send_with_retry
-from pulse.api.deps import get_session, get_transport
+from pulse.api.deps import get_principal, get_session, get_transport
+from pulse.api.visibility import require_visible_account, visible_clause
+from pulse.auth.principal import Principal
 
 router = APIRouter()
 
 MAX_SEND_ATTEMPTS = 3
 
 
+# The actor is never in the request body: it is the authenticated user (FR-006). A client that still
+# sends ``actor_user_id`` is ignored, not trusted.
 class ApproveRequest(BaseModel):
-    actor_user_id: uuid.UUID
+    pass
 
 
 class RejectRequest(BaseModel):
-    actor_user_id: uuid.UUID
     reason: str | None = None
 
 
 class EditRequest(BaseModel):
-    actor_user_id: uuid.UUID
     subject: str | None = None
     body: str | None = None
 
@@ -69,12 +71,16 @@ def _fetch(session: Session, action_id: uuid.UUID) -> dict:
 
 
 @router.get("/actions")
-def list_actions(state: str | None = Query(default=None), session: Session = Depends(get_session)):
+def list_actions(
+    state: str | None = Query(default=None), session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
+):
+    visible, params = visible_clause(principal)
     sql = "SELECT id, account_id, play_key, state, state_reason, channel, subject, body," \
-          " draft_source, created_at, decided_at, decided_by_user_id, sent_at, attempts, grounding FROM action"
-    params = {}
+          " draft_source, created_at, decided_at, decided_by_user_id, sent_at, attempts, grounding FROM action" \
+          f" WHERE account_id IN (SELECT a.id FROM account a WHERE {visible})"
     if state is not None:
-        sql += " WHERE state = :state"
+        sql += " AND state = :state"
         params["state"] = state
     sql += " ORDER BY created_at DESC"
     rows = session.execute(text(sql), params).mappings().all()
@@ -85,8 +91,10 @@ def list_actions(state: str | None = Query(default=None), session: Session = Dep
 def approve_action(
     action_id: uuid.UUID, req: ApproveRequest,
     session: Session = Depends(get_session), transport: Transport = Depends(get_transport),
+    principal: Principal = Depends(get_principal),
 ):
     row = _fetch(session, action_id)
+    require_visible_account(session, principal, row["account_id"])
     if row["state"] != "drafted":
         raise HTTPException(status_code=409, detail=f"action is already '{row['state']}'")
 
@@ -95,7 +103,7 @@ def approve_action(
             "UPDATE action SET state = 'approved', decided_by_user_id = :u, decided_at = now()"
             " WHERE id = :i"
         ),
-        {"u": req.actor_user_id, "i": action_id},
+        {"u": principal.user_id, "i": action_id},
     )
 
     to = f"csm+{row['account_id']}@example.test"
@@ -127,8 +135,12 @@ def approve_action(
 
 
 @router.post("/actions/{action_id}/reject")
-def reject_action(action_id: uuid.UUID, req: RejectRequest, session: Session = Depends(get_session)):
+def reject_action(
+    action_id: uuid.UUID, req: RejectRequest, session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
+):
     row = _fetch(session, action_id)
+    require_visible_account(session, principal, row["account_id"])
     if row["state"] != "drafted":
         raise HTTPException(status_code=409, detail=f"action is already '{row['state']}'")
 
@@ -137,14 +149,18 @@ def reject_action(action_id: uuid.UUID, req: RejectRequest, session: Session = D
             "UPDATE action SET state = 'rejected', state_reason = :r, decided_by_user_id = :u,"
             " decided_at = now() WHERE id = :i"
         ),
-        {"r": req.reason, "u": req.actor_user_id, "i": action_id},
+        {"r": req.reason, "u": principal.user_id, "i": action_id},
     )
     return _row_to_dict(_fetch(session, action_id))
 
 
 @router.patch("/actions/{action_id}")
-def edit_action(action_id: uuid.UUID, req: EditRequest, session: Session = Depends(get_session)):
+def edit_action(
+    action_id: uuid.UUID, req: EditRequest, session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
+):
     row = _fetch(session, action_id)
+    require_visible_account(session, principal, row["account_id"])
     if row["state"] != "drafted":
         raise HTTPException(
             status_code=409, detail=f"cannot edit an action already '{row['state']}'",
@@ -155,6 +171,6 @@ def edit_action(action_id: uuid.UUID, req: EditRequest, session: Session = Depen
             "UPDATE action SET subject = COALESCE(:subj, subject), body = COALESCE(:body, body),"
             " decided_by_user_id = :u, decided_at = now() WHERE id = :i"
         ),
-        {"subj": req.subject, "body": req.body, "u": req.actor_user_id, "i": action_id},
+        {"subj": req.subject, "body": req.body, "u": principal.user_id, "i": action_id},
     )
     return _row_to_dict(_fetch(session, action_id))
