@@ -66,24 +66,54 @@ specs/001-…/     spec, plan, data model, contracts (incl. openapi.yaml), tasks
 
 ## What was verified, and what was not
 
-Backend suite and frontend tests are green (`python3 -m pytest -q`; `npm test`). The
-OpenAPI contract is guarded by a test that fails if the API changes without regenerating it.
-`run_all.sh` was run against an empty database (see `HANDOFF.md` for the numbers).
+**Automated, and re-run before each commit:** backend suite (`python3 -m pytest -q`, 430 tests, against its own `pulse_test` database — never the demo one),
+frontend unit tests (`npm test`, 34), and **9 browser scenarios in real Google Chrome** against the real API and a scratch copy of the demo data
+(`npm run e2e`: sign-in/out, a wrong password, the operator queue, account feedback and suppression, the operator pages, approving a draft in demo mode,
+CSM scoping and the server refusing the admin API). The OpenAPI contract has a drift test. **Mutation-checked** (each protection removed, a named test goes red):
+tenant isolation, identity forgery, CSM ownership, approver identity, the send gate, demo mode, no-retry-on-ambiguous, the LLM output validator, the
+provider-failure fallback and prompt isolation (`docs/VERIFICATION.md`). `run_all.sh` was run from an empty database (exit 0) and training was reproduced
+across a full rebuild.
 
-Against the spec's success criteria — stated plainly, including the misses:
+**The model, honestly.** Precision@100 is **0.29** against **0.02** for the heuristic baseline (about 12×); ROC-AUC **0.69**. That is one draw from a
+range — **0.22–0.33** — because the figure moves with row order (B-27); it is reproducible for a given dataset, not a point to quote to two decimals.
+A *new* tenant the model has not seen does worse (leave-one-tenant-out ROC-AUC: globex 0.71, northwind 0.67, **initech 0.53**), so for a small new tenant the
+shared model barely helps. Against the spec's success criteria: **met** SC-001/002 (queue and evidence trail), SC-003, SC-007 (a full cycle over ~4,500 accounts in
+about 105 s against a 15-minute interval), SC-008–SC-014. **Not met — SC-005 and SC-006:** ROC-AUC is far below the 0.8+ the generator allows, and the two planted
+"lost renewal" accounts are **not flagged** at any point (`clarifications.md` B-15); I did not tune against the two fixtures, which would be overfitting the demo, so
+**lead time is not reported** (`GET /model` says so). SC-004 (calibration tolerance) is reported as a reliability curve but its tolerance is not asserted.
 
-- **Met:** SC-001/002 (queue and evidence trail), SC-003 (precision@100 0.20 vs 0.02 for the heuristic baseline, seed 7), SC-007 (a full cycle over ~4,500 accounts in about 105 s against a 15-minute interval), SC-008–SC-014.
-- **Not met — SC-005 and SC-006.** ROC-AUC on the held-out block is **0.68**, below the 0.8+ the generator was designed to allow, and the two planted retrospective accounts (the stand-ins for "the two renewals we lost") are **not flagged** at any point in their history. Their individual features do show decline; the support-degradation story is carried by response time while the model leans on ticket volume. This is investigated in `clarifications.md` B-15. I did not tune against the two fixtures, which would be overfitting to the demo. **The lead-time distribution is therefore not reported** (`GET /model` says so rather than omitting it).
-- **SC-004 (calibration tolerance)** is reported as a reliability curve; the tolerance check itself is not asserted.
+**Not verified — stated so nobody assumes otherwise:**
+- **No real email has ever been sent** by this system, and **no real language-model call has ever been made.** Both are exercised only against stand-ins (an in-process
+  fake SMTP server; scripted model replies). The real SMTP path and the 15-line Anthropic adapter have never run against a real provider.
+- **The containers have never been built or run** (Docker is not installed here).
+- The browser tests cover the main paths and the key refusals in **Chrome only** — no other browser, no mobile layout, no accessibility audit.
+- The shared login limiter is tested with two limiter objects, not two real processes. Nothing has been load-tested; the 10× claim below is arithmetic from one measurement.
 
-## Deliberately skipped
+## Decisions (with reasons)
 
-- **Real email transport and a live LLM.** Transport is a recording stub; the LLM drafting path exists behind the same interface but is lazily imported only when enabled, and is unreachable by default.
-- **Authentication.** Tenant and user come from headers; isolation does not depend on how the caller was identified, but a real deployment needs a session in front of it.
-- **Treatment-effect (uplift) modelling.** No intervention history exists (B4); risk only. Play outcomes are recorded so uplift is possible later.
-- **Per-tenant models.** One shared model (B-7); per-tenant slices are reported, not fitted.
-- **`docker-compose.yml` / `Makefile` (T004).** The compose file and Dockerfiles now exist (see *Containers* below) but are **unverified** — they have never been built or run, because Docker is not installed on the machine this was built on. There is no `Makefile`; `run_all.sh` remains the verified one-command path.
-- **Lead-time backtest** — see above.
+- **Draft, don't send — and when sending, be safe by default.** The request asked to email red accounts automatically. Red often means *we* failed the customer; a cheerful template to someone
+  with a nine-day-old P1 does harm. A human approves; auto-send is opt-in per tenant per play, behind suppression and rate limits. Outbound is **off** until an operator verifies a sender;
+  **demo mode is the default** (mail goes only to a test inbox, or is captured without delivery); an opted-out or contact-less account is never emailed.
+- **A message that might have been sent is never sent again.** An ambiguous outcome (the body went out, no answer came back) becomes `send_unconfirmed` for a human — exactly-once is not
+  achievable over a provider-neutral mail protocol, so the guarantee is "never *knowingly* twice".
+- **A model ranks; a language model only writes** — from derived facts, never from ticket or email text, and its output is rejected if any number, link or claim does not trace to those facts.
+  The system runs identically with it off, on, or failing.
+- **Opaque server-side sessions, not JWTs; login by workspace.** Revocable, and a changed role bites on the next request; the same email can exist in two tenants. Tenant isolation is
+  still enforced by the database, and now the tenant comes from a verified session rather than a header.
+- **One shared model**, per-tenant slices reported but not fitted (most tenants have too few churn events to fit one — the cold-start result above is the cost of that choice).
+- **No uplift modelling.** There is no intervention history to learn "did the call help" from; outcomes are recorded so it can be added.
+
+## Gaps (not done — these are not decisions)
+
+- **Sign-in:** no SSO/OIDC, MFA, self-service sign-up or email-driven password reset (operators reset passwords). Every demo user shares one generated password. `Secure` cookies are off by
+  default (turn on behind HTTPS) and there is no TLS terminator. The application database roles' passwords are fixed in a migration (development defaults).
+- **Email:** bounces, complaints and replies are not processed, so a hard bounce is unknown and an opt-out sent by reply must be entered by an operator. SMTP credentials are deployment-level, not
+  per tenant. No contact import.
+- **Model:** lead time is not reported and the planted retrospective accounts are missed (above); no per-tenant model; the cold-start result for small tenants is weak.
+- **Operations:** a whole-tenant cycle is one transaction (one bad account fails the tenant's cycle); a persistently failing tenant is retried every 30 s with no backoff; login attempts and
+  the audit trail are not exported or paginated beyond the last 200 events.
+- **Containers:** written and statically checked, never built (see *Containers*).
+- **Presentation:** the deck is an `.pptx` built from `docs/DECK.md`; the Loom walkthrough is a **script** (`docs/LOOM_SCRIPT.md`) and has **not been recorded**; there is no hosted URL — the system runs locally.
 
 ## What breaks first at 10×
 

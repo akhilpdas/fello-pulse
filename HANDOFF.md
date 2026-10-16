@@ -490,7 +490,7 @@ purpose: three years of weekly usage rollups dominate), five sources, 9,252 even
 occurred, 10,930 (3%) with an unresolved identity, 94 accounts with <5 events. The generated data's present
 (2026-11-10) is later than the machine's wall clock (2026-10-16); that is why the worker has `--simulate-present`.
 
-**Still not done, and not hidden:** SC-005/SC-006 (AUC 0.68; the two planted accounts are not flagged; no lead
+**Still not done, and not hidden:** SC-005/SC-006 (AUC 0.69; the two planted accounts are not flagged; no lead
 time); no real-browser run of the UI; the Loom is a script, not a recording; no hosted/"live" URL — it runs locally;
 no auth layer; nothing pushed to GitHub until the owner says so.
 

@@ -555,3 +555,37 @@ reproducible result. **What may be claimed:** precision@100 is roughly **0.22–
 ROC-AUC **0.68–0.69**; any single figure is a draw from that range. Earlier documents quoting "0.33", "0.326" or "0.196" as *the* result
 overstated its precision. B-22 and B-25 above are superseded by this entry for the figure itself.
 
+### B-28 — Authentication: what was chosen, what was rejected, what is open (spec 002 US1)
+
+**Chosen.** Email + password per tenant user; the login names a *workspace* (tenant slug), because the same email can exist in two
+tenants and an email-only login would need an ambiguous merge. Passwords: stdlib scrypt, per-user salt, parameters stored with the hash.
+Sessions are **opaque and server-side** (`<tenant_id>.<secret>`; only `sha256(secret)` is stored), sent as an `HttpOnly; SameSite=Strict`
+cookie (or a bearer token for API clients), with an `X-Requested-With` check on cookie-authenticated writes. The tenant id in the token is
+*untrusted*: it only selects the claim under which the lookup runs, and row-level security then hides every row that is not that tenant's, so a
+forged prefix finds nothing — no `SECURITY DEFINER` function, no cross-tenant read on the request path (constitution IV). A disabled user or a
+changed role takes effect on the next request. Failures return one identical 401 and cost the same time. Rate limiting is shared across
+instances (Postgres, hashed keys).
+**Rejected.** JWT (not revocable without a store, tempts putting the role in the token); SSO/OIDC and MFA (out of scope; a real tenant will ask for SSO);
+email-driven password reset (operators reset; self-service reset needs the mail path to be trusted first); per-process limiting.
+**Open / not done.** Every demo user shares one generated password; no password-breach check beyond a short deny-list; no session listing or
+"sign out everywhere" for a user; no account lockout notification; `Secure` cookies are off by default (set `PULSE_COOKIE_SECURE` behind HTTPS).
+The application roles' passwords are fixed in migration 0002 (development defaults).
+
+### B-29 — Email: what "real delivery" means here, and its limits (spec 002 US2)
+
+**Chosen.** One code path (`agent/delivery.py`) for a human approval *and* the unattended cycle. A pure send gate: outbound switched on, a **verified**
+sender, a provider, a known contact, no opt-out — each failure its own state, zero network traffic. **Demo mode is the default**: mail goes only to a
+test inbox, or is captured without delivery. Approve is one atomic conditional UPDATE, so two simultaneous approvals send once. Outcomes are classified
+**transient / permanent / ambiguous**; only transient is retried (≤3). An *ambiguous* outcome (the body was sent and no answer came back) becomes
+`send_unconfirmed`, is **never** retried, and tells a human to check the provider — exactly-once is not achievable over a provider-neutral mail protocol,
+so the guarantee is "never knowingly send twice". Changing the sender address revokes verification and switches sending off.
+**Limits, stated.** No real email has been sent by this system (an in-process fake SMTP server stands in). Bounces, complaints and replies are not processed,
+so a hard bounce is unknown to us and an opt-out sent by *reply* must be entered by an operator. SMTP credentials are deployment-level (environment), not
+per tenant. The customer contact comes from the CRM feed only; there is no contact import and no contact deduplication.
+
+**B-27 addendum — verified across a full rebuild.** With the fix, dropping *both* databases and rebuilding from nothing gave precision@100 **0.289**,
+ROC-AUC **0.690**, PR-AUC 0.100, Brier 0.0348, heuristic baseline 0.023 (about 12×) — identical to the canonical-order figure measured on the previous build.
+Per-tenant test ROC-AUC: globex 0.745, initech 0.546, northwind 0.678. Cold start (leave-one-tenant-out) ROC-AUC / precision@100: globex 0.706 / 0.315,
+northwind 0.672 / 0.090, **initech 0.528 / 0.044** — a small new tenant gets almost no benefit from a model trained on the others. Captured value at the
+operating point is 4.6% of value at risk. These supersede the cold-start figures in B-25 (which came from a differently-ordered build).
+
