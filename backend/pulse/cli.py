@@ -22,7 +22,7 @@ from pathlib import Path
 from sqlalchemy import text
 
 from pulse.auth.passwords import validate_password
-from pulse.config import SystemClock
+from pulse.config import SystemClock, get_settings
 from pulse.db.session import owner_session, tenant_session
 from pulse.ingest.dimension import refresh_accounts
 from pulse.ingest.service import (
@@ -225,6 +225,36 @@ def cmd_bootstrap_demo(args) -> int:
     return 0
 
 
+def cmd_send_test(args) -> int:
+    """Send one clearly labelled test message through the configured mail provider and say exactly how it went.
+
+    The one-command check that the *real* mail path works with real credentials (everything else in the test suite uses a
+    fake SMTP server). Touches no database and no customer; the recipient is whoever you name -- use your own address.
+    """
+    from pulse.agent.transport import select_transport
+
+    settings = get_settings()
+    if not settings.smtp_host:
+        print("PULSE_SMTP_HOST is not set, so there is no mail provider to test. Set PULSE_SMTP_HOST (and "
+              "PULSE_SMTP_PORT, PULSE_SMTP_USER, PULSE_SMTP_PASSWORD) and try again.")
+        return 2
+    result = select_transport(settings).send(
+        to=args.to, sender=args.sender or settings.smtp_user,
+        subject="Pulse test message",
+        body="This is a test message from Pulse, sent by `pulse send-test`. No customer was contacted and nothing in "
+             "any account was changed. If you can read this, outbound email works from this deployment.\n",
+    )
+    if result.ok:
+        print(f"delivered to the provider for {args.to} (message id: {result.provider_message_id or 'n/a'}). "
+              "Check the inbox to confirm it arrived.")
+        return 0
+    advice = {"ambiguous": "Delivery could not be confirmed -- check the inbox and the provider's log before trying again.",
+              "permanent": "The provider refused it and retrying will not help: fix the credentials, sender or address.",
+              "transient": "A temporary failure: try again shortly."}[result.kind]
+    print(f"FAILED ({result.kind}): {result.error}\n{advice}")
+    return 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="pulse")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -239,6 +269,8 @@ def main() -> int:
     bd = sub.add_parser("bootstrap-demo"); bd.add_argument("--feeds", default="../data/feeds")
     bd.add_argument("--seed", type=int, default=20261015); bd.add_argument("--artifacts", default="../artifacts")
     bd.add_argument("--demo-password", default=None); bd.set_defaults(fn=cmd_bootstrap_demo)
+    st = sub.add_parser("send-test", help="send one test message through the configured SMTP provider")
+    st.add_argument("--to", required=True); st.add_argument("--sender", default=None); st.set_defaults(fn=cmd_send_test)
     sv = sub.add_parser("serve"); sv.add_argument("--artifacts", default="../artifacts")
     sv.add_argument("--simulate-present", action="store_true")
     sv.add_argument("--max-ticks", type=int, default=None); sv.set_defaults(fn=cmd_serve)

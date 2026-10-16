@@ -37,8 +37,7 @@ still finishes inside its 15-minute interval (SC-011); today ~104 s for ~4,500 a
 **Constraints**: isolation must not depend on any client-supplied value (FR-002/003); no secret in the
 repo, an image, a log or an API response (FR-021/033); non-container path must keep working (FR-035).
 
-**Scale/Scope**: 3 tenants / ~5k accounts today; per-process login limiter is a known single-instance
-limit (research R-4).
+**Scale/Scope**: 3 tenants / ~5k accounts today; the login limiter is shared across instances through Postgres (research R-4, revised).
 
 ## Constitution Check
 

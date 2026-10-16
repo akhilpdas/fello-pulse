@@ -147,3 +147,6 @@ and it assumed the first few drafts had a contact (≈1 in 9 do not, and they cl
 **Deck:** `docs/Pulse_deck.pptx` rebuilt with the real top of the signed-in queue (the builder signs in; tested against a stand-in server). Only slide 1 has ever been rendered to an image (macOS Quick Look); slides 2–11 are text and one table, checked programmatically.
 
 **Totals at the end:** backend 436 · frontend 34 · browser 9. Nothing pushed.
+
+**`pulse send-test`** (added 2026-10-17): one command that sends a labelled test message through the configured SMTP provider and reports delivered / permanent / transient / unconfirmed. Tested against the fake server only (4 tests); it exists so the one
+unverified step — a real message to a real inbox — is a one-minute job for whoever holds credentials. **It has not been run against a real provider.**

@@ -84,7 +84,9 @@ about 105 s against a 15-minute interval), SC-008–SC-014. **Not met — SC-005
 
 **Not verified — stated so nobody assumes otherwise:**
 - **No real email has ever been sent** by this system, and **no real language-model call has ever been made.** Both are exercised only against stand-ins (an in-process
-  fake SMTP server; scripted model replies). The real SMTP path and the 15-line Anthropic adapter have never run against a real provider.
+  fake SMTP server; scripted model replies). The real SMTP path and the 15-line Anthropic adapter have never run against a real provider. **To verify real email in one minute:** set `PULSE_SMTP_HOST`,
+  `PULSE_SMTP_PORT`, `PULSE_SMTP_USER`, `PULSE_SMTP_PASSWORD` for a provider you have an account with, then `python3 -m pulse.cli send-test --to <your own address> --sender <an address the provider lets you send from>` —
+  it sends one labelled test message, touches no customer or database, and reports delivered / refused / unconfirmed.
 - **The containers have never been built or run** (Docker is not installed here).
 - The browser tests cover the main paths and the key refusals in **Chrome only** — no other browser, no mobile layout, no accessibility audit.
 - The shared login limiter is tested with two limiter objects, not two real processes. Nothing has been load-tested; the 10× claim below is arithmetic from one measurement.

@@ -22,10 +22,12 @@ exception. *Rejected*: a global session table (a cross-tenant read serving reque
 to an id from the global `tenant` table, then everything runs under that claim. *Why*: the same email may
 exist in two tenants (edge case); email-only login would need an ambiguous merge. *Rejected*: email-only.
 
-**R-4 Login rate limiting.** In-process sliding window keyed by (client address, workspace, email),
-returning the same response for unknown and known accounts, with a constant-cost password check for unknown
-users. *Known limit, stated*: per process — with N API instances the allowance is N× (a shared store is the
-fix, not built). *Rejected*: DB-backed counters (cannot attribute attempts for an unknown workspace under RLS).
+**R-4 Login rate limiting.** *(Revised after the first build.)* Two limits — per (client address, workspace, email) and per
+source address across every account (password spraying) — returning the same response for unknown and known accounts, with a
+constant-cost password check for unknown users. State is in Postgres (`login_attempt`, a declared *global* table holding only a
+hash and a time), so the allowance holds across API instances. The first design was an in-process window and rejected a database
+counter because an unknown workspace has no tenant to attribute attempts to under RLS; a non-tenant hashed table solves that, and
+the in-process limiter remains only for unit tests. Not load-tested.
 
 **R-5 CSRF and cookies.** `SameSite=Strict` plus required `X-Requested-With` on state-changing cookie
 requests; `Secure` when served over HTTPS. Bearer-token requests are not CSRF-able and skip the header.

@@ -90,6 +90,7 @@ class SmtpTransport:
         return cls(
             s.smtp_host, s.smtp_port, user=s.smtp_user,
             password=s.smtp_password.get_secret_value() if s.smtp_password else None, starttls=s.smtp_starttls,
+            timeout=s.smtp_timeout,
         )
 
     def __repr__(self) -> str:

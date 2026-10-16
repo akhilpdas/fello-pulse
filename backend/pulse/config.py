@@ -109,6 +109,7 @@ class Settings(BaseSettings):
     smtp_user: str | None = None
     smtp_password: SecretStr | None = None
     smtp_starttls: bool = True
+    smtp_timeout: float = 15.0  # seconds; a hung provider must not hang an approval
 
     # Model promotion gate: a candidate must beat the heuristic baseline at the
     # operating point by at least this margin in precision to be promoted.

@@ -19,7 +19,7 @@ python3 -m pulse.openapi_export         # contract drift test fails until regene
    Northwind. A CSM opening `/admin/config` → 403.
 2. **Gaps (Phase 0).** On an account, mark *false positive* → a `feedback` row exists; *suppress for 14
    days* → it leaves the queue, still has a score. `GET /model` shows `leave_one_tenant_out`.
-3. **Email (US2).** Start the fake SMTP sink (`python3 -m pulse.tools.smtp_sink`), set `PULSE_SMTP_HOST=127.0.0.1`
+3. **Email (US2).** *(Real provider: `python3 -m pulse.cli send-test --to <you>` with `PULSE_SMTP_*` set — see README.)* Start the fake SMTP sink (`python3 -m pulse.tools.smtp_sink`), set `PULSE_SMTP_HOST=127.0.0.1`
    `PULSE_SMTP_PORT=1025`, enable outbound for the tenant in demo mode, approve a draft → exactly one message in
    the sink, addressed to the test inbox, subject prefixed `[DEMO →`. Stop the sink and approve another → `send_failed`.
 4. **LLM (US3).** `pip install -e ".[llm]"`, then `PULSE_LLM_ENABLED=true PULSE_LLM_API_KEY=… python3 -m pulse.cli cycle` → drafts show `draft_source: llm` and a model name.
