@@ -173,6 +173,58 @@ def cmd_serve(args) -> int:
     return 0
 
 
+def _feeds_present(feeds: Path) -> bool:
+    return (feeds / "manifest.json").exists()
+
+
+def _generate(feeds: Path, seed: int) -> None:
+    """Run the simulator (a separate script, deliberately not part of the application package)."""
+    import subprocess
+
+    script = Path(os.environ.get("PULSE_GENERATOR", "../generator/main.py"))
+    subprocess.run([sys.executable, str(script), "--out", str(feeds), "--seed", str(seed)], check=True)
+
+
+def _train() -> None:
+    from pulse.ml import pipeline
+
+    pipeline.run()
+
+
+def _operators() -> list[tuple[str, str]]:
+    with owner_session() as s:
+        return [(r[0], r[1]) for r in s.execute(text(
+            "SELECT t.slug, u.email FROM tenant t JOIN app_user u ON u.tenant_id = t.id AND u.role = 'operator'"
+            " WHERE EXISTS (SELECT 1 FROM ingestion_watermark w WHERE w.tenant_id = t.id) ORDER BY t.slug")).all()]
+
+
+def cmd_bootstrap_demo(args) -> int:
+    """The container path's ``run_all.sh``: generate (if needed) -> bootstrap -> ingest -> train -> one cycle, then
+    say how to sign in. Idempotent -- re-running fills in only what is missing."""
+    import secrets
+
+    feeds = Path(args.feeds).resolve()
+    password = args.demo_password or os.environ.get("PULSE_DEMO_PASSWORD") or None
+    generated = password is None
+    if generated:
+        password = secrets.token_urlsafe(12)
+    if not _feeds_present(feeds):
+        print("generating the simulated estate ...", flush=True)
+        _generate(feeds, args.seed)
+    cmd_bootstrap(argparse.Namespace(feeds=args.feeds, demo_password=password))
+    cmd_ingest(argparse.Namespace(feeds=args.feeds, until=None))
+    _train()
+    cmd_cycle(argparse.Namespace(as_of=None, artifacts=args.artifacts))
+    print("\nSign in at http://localhost:5173 (workspace = the tenant name):")
+    for slug, email in _operators():
+        print(f"  workspace {slug:10s} operator {email}")
+    if generated:
+        print(f"  password: {password}   (shown once; set PULSE_DEMO_PASSWORD to choose your own)")
+    else:
+        print("  password: the one you supplied")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="pulse")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -184,6 +236,9 @@ def main() -> int:
     st = sub.add_parser("status"); st.set_defaults(fn=cmd_status)
     c = sub.add_parser("cycle"); c.add_argument("--as-of", default=None)
     c.add_argument("--artifacts", default="../artifacts"); c.set_defaults(fn=cmd_cycle)
+    bd = sub.add_parser("bootstrap-demo"); bd.add_argument("--feeds", default="../data/feeds")
+    bd.add_argument("--seed", type=int, default=20261015); bd.add_argument("--artifacts", default="../artifacts")
+    bd.add_argument("--demo-password", default=None); bd.set_defaults(fn=cmd_bootstrap_demo)
     sv = sub.add_parser("serve"); sv.add_argument("--artifacts", default="../artifacts")
     sv.add_argument("--simulate-present", action="store_true")
     sv.add_argument("--max-ticks", type=int, default=None); sv.set_defaults(fn=cmd_serve)

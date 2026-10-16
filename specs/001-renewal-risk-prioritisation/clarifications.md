@@ -543,3 +543,15 @@ and is deliberately exempt); or that a model cannot phrase something misleading 
 **Not done:** a real provider call has never been made (scripted stand-ins only); per-tenant keys (one deployment key); prompt
 caching, streaming and retries (`max_retries=0` — a failed call becomes a template, not a delay).
 
+### B-27 — The headline metric is reproducible only for a fixed row order, and is noisy even then (found by rebuilding)
+
+Rebuilding the demo database on **identical data** (347,740 events, byte-identical feeds) gave precision@100 of 0.196, then 0.252;
+earlier builds gave 0.30, 0.326 and 0.288. Cause: the panel was built from `SELECT id FROM account` with no `ORDER BY`, so row
+order followed Postgres's physical layout (which changes on update and rebuild), and the model followed row order. Measured on one
+database with only the account order changed: **precision@100 0.217 / 0.289 / 0.333, ROC-AUC 0.676 / 0.690 / 0.682**, heuristic
+baseline 0.021–0.023. (Part of the sensitivity is structural: gradient boosting's early-stopping validation split is drawn by row index.)
+**Fix:** accounts are ordered by their stable external reference (`panel_account_ids`, test-first), so a given dataset now yields one
+reproducible result. **What may be claimed:** precision@100 is roughly **0.22–0.33 against ~0.02 for the heuristic (about 10–15×)** and
+ROC-AUC **0.68–0.69**; any single figure is a draw from that range. Earlier documents quoting "0.33", "0.326" or "0.196" as *the* result
+overstated its precision. B-22 and B-25 above are superseded by this entry for the figure itself.
+

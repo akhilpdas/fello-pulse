@@ -1,0 +1,73 @@
+# One command: docker compose up --build        (UNVERIFIED -- see README: Docker is not installed on the dev machine)
+# Then, once:  docker compose run --rm api python3 -m pulse.cli bootstrap-demo
+# Open http://localhost:5173 and sign in (the command prints the workspace, email and password).
+#
+# Secrets come from the environment (or a local .env file that is never committed), never from this file:
+#   POSTGRES_PASSWORD, PULSE_DEMO_PASSWORD, PULSE_SMTP_*, PULSE_LLM_API_KEY
+# The application roles' passwords (pulse_app / pulse_trainer) are fixed by migration 0002 -- development
+# defaults. Change them before exposing this anywhere real.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pulse
+      POSTGRES_DB: pulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulse-dev-only}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulse -d pulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: { context: ., dockerfile: infra/docker/backend.Dockerfile }
+    environment: &app-env
+      MIGRATE: "1"
+      PULSE_DATABASE_URL_OWNER: postgresql+psycopg://pulse:${POSTGRES_PASSWORD:-pulse-dev-only}@db:5432/pulse
+      PULSE_DATABASE_URL_APP: postgresql+psycopg://pulse_app:pulse_app@db:5432/pulse
+      PULSE_COOKIE_SECURE: ${PULSE_COOKIE_SECURE:-false}
+      PULSE_DEMO_PASSWORD: ${PULSE_DEMO_PASSWORD:-}
+      PULSE_SMTP_HOST: ${PULSE_SMTP_HOST:-}
+      PULSE_SMTP_PORT: ${PULSE_SMTP_PORT:-587}
+      PULSE_SMTP_USER: ${PULSE_SMTP_USER:-}
+      PULSE_SMTP_PASSWORD: ${PULSE_SMTP_PASSWORD:-}
+      PULSE_LLM_ENABLED: ${PULSE_LLM_ENABLED:-false}
+      PULSE_LLM_API_KEY: ${PULSE_LLM_API_KEY:-}
+    volumes:
+      - feeds:/app/data
+      - artifacts:/app/artifacts
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  worker:
+    build: { context: ., dockerfile: infra/docker/backend.Dockerfile }
+    command: ["python3", "-m", "pulse.cli", "serve", "--simulate-present"]
+    environment:
+      <<: *app-env
+      MIGRATE: "0"   # the api migrates; two containers must not race on the schema
+    volumes:
+      - feeds:/app/data
+      - artifacts:/app/artifacts
+    depends_on:
+      db: { condition: service_healthy }
+      api: { condition: service_healthy }
+    restart: unless-stopped
+
+  web:
+    build: { context: ., dockerfile: infra/docker/frontend.Dockerfile }
+    ports:
+      - "127.0.0.1:5173:8080"
+    depends_on:
+      api: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  feeds:
+  artifacts:

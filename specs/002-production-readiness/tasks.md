@@ -145,13 +145,13 @@ is labelled so, never presented as test-first. Run the **full** suite (`python3 
 
 **Goal**: files written and statically checked; **not run** (Docker is not installed). Every doc says so until run.
 
-- [ ] T289 [P] [US4] RED `backend/tests/unit/test_container_files.py` — static checks: compose parses; services `db`, `api`, `worker`, `web` exist; db has a healthcheck and the others `depends_on: condition: service_healthy`; a named volume holds Postgres data; no password literal other than `${VAR:-dev}` defaults; images do not `COPY` `data/`, `artifacts/` or `.env`; `.dockerignore` excludes them. Fails: files missing. (FR-031, FR-033)
-- [ ] T290 [P] [US4] GREEN `infra/docker/backend.Dockerfile` (multi-stage; API and worker share the image) + `infra/docker/entrypoint.sh` (wait for db, `alembic upgrade head`). (FR-031)
-- [ ] T291 [P] [US4] GREEN `infra/docker/frontend.Dockerfile` (build → nginx, `/api` proxied to `api`). (FR-031)
-- [ ] T292 [US4] GREEN `docker-compose.yml` + `.dockerignore`. (FR-031, FR-033)
-- [ ] T293 [US4] RED `backend/tests/unit/test_cli_bootstrap_demo.py` + GREEN `pulse.cli bootstrap-demo` — the `run_all.sh` stages as one CLI command usable inside a container; same seed → same estate. (FR-032)
-- [ ] T294 [US4] Mark **UNVERIFIED** in `README.md`, `quickstart.md`, `HANDOFF.md`; add a "first run on a machine with Docker" checklist and where to record the result. (FR-034, SC-012)
-- [ ] T295 [US4] GUARD re-run `bash infra/scripts/run_all.sh` on a fresh DB and the VS Code tasks — the non-container path still works unchanged. (FR-035)
+- [x] T289 [P] [US4] RED `backend/tests/unit/test_container_files.py` — static checks: compose parses; services `db`, `api`, `worker`, `web` exist; db has a healthcheck and the others `depends_on: condition: service_healthy`; a named volume holds Postgres data; no password literal other than `${VAR:-dev}` defaults; images do not `COPY` `data/`, `artifacts/` or `.env`; `.dockerignore` excludes them. Fails: files missing. (FR-031, FR-033)
+- [x] T290 [P] [US4] GREEN `infra/docker/backend.Dockerfile` (multi-stage; API and worker share the image) + `infra/docker/entrypoint.sh` (wait for db, `alembic upgrade head`). (FR-031)
+- [x] T291 [P] [US4] GREEN `infra/docker/frontend.Dockerfile` (build → nginx, `/api` proxied to `api`). (FR-031)
+- [x] T292 [US4] GREEN `docker-compose.yml` + `.dockerignore`. (FR-031, FR-033)
+- [x] T293 [US4] RED `backend/tests/unit/test_cli_bootstrap_demo.py` + GREEN `pulse.cli bootstrap-demo` — the `run_all.sh` stages as one CLI command usable inside a container; same seed → same estate. (FR-032)
+- [x] T294 [US4] Mark **UNVERIFIED** in `README.md`, `quickstart.md`, `HANDOFF.md`; add a "first run on a machine with Docker" checklist and where to record the result. (FR-034, SC-012)
+- [x] T295 [US4] GUARD re-run `bash infra/scripts/run_all.sh` on a fresh DB and the VS Code tasks — the non-container path still works unchanged. (FR-035)
 
 ## Phase 6 — Honesty and delivery
 

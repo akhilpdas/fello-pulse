@@ -60,3 +60,33 @@ def test_disabled_or_unkeyed_the_unattended_cycle_never_touches_the_model(monkey
     for enabled, key in [(False, "sk-test-key"), (True, None), (False, None)]:
         sources, seen = _run(monkeypatch, enabled=enabled, key=key)
         assert sources == ["template"] and seen == {}, (enabled, key)
+
+
+def _no_model_with_key(monkeypatch, key: str):
+    monkeypatch.setenv("PULSE_LLM_ENABLED", "true")
+    monkeypatch.setenv("PULSE_LLM_API_KEY", key)
+    reset_settings()
+    built = []
+    monkeypatch.setattr(llm_module, "build_llm_drafter", lambda k, **kw: built.append(k))
+    tenant_id, cfg = seed_tenant(AS_OF)
+    with owner_session() as s:
+        seed_account(s, tenant_id, AS_OF, "wk-empty", n_tickets=15)
+    result = run_once(tenant_id=tenant_id, model=toy_support_model(13), model_version="t", tenant_config=cfg,
+                      as_of=AS_OF, transport=RecordingTransport(), worker_id="w", lease_seconds=60)
+    with owner_session() as s:
+        sources = s.execute(text("SELECT draft_source FROM action WHERE agent_run_id = :r"), {"r": result.run_id}).scalars().all()
+    reset_settings()
+    return built, sources
+
+
+def test_an_empty_key_is_no_key_even_when_enabled(monkeypatch):
+    """GUARD: compose passes ``PULSE_LLM_API_KEY=`` by default. (``SecretStr`` has a length, so empty is already falsy --
+    this passed before any change and protects that.)"""
+    built, sources = _no_model_with_key(monkeypatch, "")
+    assert built == [] and sources == ["template"]
+
+
+def test_a_whitespace_only_key_is_no_key_either(monkeypatch):
+    """RED before the strip check in ``_make_llm``: ``SecretStr("   ")`` is non-empty, so a client was built with it."""
+    built, sources = _no_model_with_key(monkeypatch, "   ")
+    assert built == [] and sources == ["template"]

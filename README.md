@@ -35,6 +35,24 @@ The five constitutional non-negotiables and the test that proves each:
 4. **Tenant isolation below the application** — Postgres row-level security, `FORCE`d, on all 13 tenant tables; the app role is `NOBYPASSRLS`; the tenant claim is transaction-local. *Tests:* `tests/isolation/`, mutation-verified (`docs/VERIFICATION.md`).
 5. **Nothing unexplained reaches a human** — every score persists with SHAP drivers and resolvable evidence ids; drafts are grounding-validated before anyone sees them. *Tests:* evidence trail, score diff, grounding validation.
 
+## Containers — UNVERIFIED
+
+`docker-compose.yml` + `infra/docker/` define the database, API, the unattended worker and the web app. **Treat this as
+unverified: none of it has ever been built or run** (Docker is not installed on the dev machine). What *is* checked,
+without a container runtime, by `tests/unit/test_container_files.py`: dependency ordering and healthchecks, the
+database in a named volume and not published to the network, no secrets or generated data baked into an image,
+a non-root user, and a build context that excludes data, models, `.env` and credentials. To try it:
+
+```bash
+docker compose up --build
+docker compose run --rm api python3 -m pulse.cli bootstrap-demo     # builds the demo estate; prints the sign-in
+# open http://localhost:5173
+```
+
+When someone runs this on a machine with Docker, record the outcome in `HANDOFF.md` and remove this label. Known limits:
+the application roles' passwords are fixed by migration 0002 (development defaults — change before exposing anything);
+images are not scanned or pinned by digest; no TLS terminator is included.
+
 ## Layout
 
 ```
@@ -64,7 +82,7 @@ Against the spec's success criteria — stated plainly, including the misses:
 - **Authentication.** Tenant and user come from headers; isolation does not depend on how the caller was identified, but a real deployment needs a session in front of it.
 - **Treatment-effect (uplift) modelling.** No intervention history exists (B4); risk only. Play outcomes are recorded so uplift is possible later.
 - **Per-tenant models.** One shared model (B-7); per-tenant slices are reported, not fitted.
-- **`docker-compose.yml` / `Makefile` (T004).** Docker was unavailable where this was built; `run_all.sh` is the one-command path.
+- **`docker-compose.yml` / `Makefile` (T004).** The compose file and Dockerfiles now exist (see *Containers* below) but are **unverified** — they have never been built or run, because Docker is not installed on the machine this was built on. There is no `Makefile`; `run_all.sh` remains the verified one-command path.
 - **Lead-time backtest** — see above.
 
 ## What breaks first at 10×

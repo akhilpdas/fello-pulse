@@ -552,3 +552,12 @@ Backend **371 passed**, frontend **29 passed**, build clean. Tasks T249–T273 d
 **Not verified:** no real email has ever been sent by this system — only to an in-process fake SMTP server. Bounces, replies
 and complaints are not processed. The operator pages (outbound settings, opt-outs, users, audit) exist only as API routes. The
 demo database has not been rebuilt, so it does not yet contain customer contacts (rebuild with the "RESET" then "build demo data" tasks).
+
+---
+
+## Containers (spec 002 Phase 5) — UNVERIFIED
+
+`docker-compose.yml`, `infra/docker/{backend,frontend}.Dockerfile`, `entrypoint.sh`, `nginx.conf`, `.dockerignore` are written and
+statically checked (`tests/unit/test_container_files.py`). **They have never been built or run: Docker is not installed on this
+machine.** First run on a machine with Docker: `docker compose up --build`, then
+`docker compose run --rm api python3 -m pulse.cli bootstrap-demo`; record the result here and remove the "unverified" labels.

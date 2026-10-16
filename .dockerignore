@@ -1,0 +1,24 @@
+# Nothing generated, secret or heavy ever enters an image (FR-033).
+.git
+.gitignore
+.venv
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+dist
+data
+artifacts
+.env
+.env.*
+.demo-credentials*
+*.pkl
+*.joblib
+pulse-sync.bundle
+specs
+docs
+.specify
+.claude
+.vscode

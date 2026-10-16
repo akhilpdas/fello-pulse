@@ -81,6 +81,16 @@ def split_with_tenants(rows: list[PanelRow], tenants: list[str], **fractions) ->
     )
 
 
+def panel_account_ids(session, tenant_id) -> list:
+    """The tenant's accounts in a *stable* order. Without an ORDER BY, Postgres returns rows in physical layout
+    order, which changes whenever rows are updated or the database is rebuilt -- so the panel's row order, and the
+    model fitted on it, changed with it: the same data gave precision@100 of 0.196, 0.252, 0.288 and 0.326 on
+    different builds. Order by the account's stable external reference instead."""
+    return [r[0] for r in session.execute(
+        text("SELECT id FROM account WHERE tenant_id = :t ORDER BY external_ref"), {"t": tenant_id}
+    ).all()]
+
+
 def build_full_panel(clock: Clock, horizon_days: int) -> tuple[list[PanelRow], list[str]]:
     """Every tenant, every account. Returns the panel plus a parallel list of
     tenant slugs -- PanelRow itself stays tenant-agnostic and pure."""
@@ -100,9 +110,7 @@ def build_full_panel(clock: Clock, horizon_days: int) -> tuple[list[PanelRow], l
             ).one()
             connected = frozenset(cfg[0])
             threshold = float(cfg[1])
-            account_ids = [r[0] for r in s.execute(
-                text("SELECT id FROM account WHERE tenant_id = :t"), {"t": tenant_id}
-            ).all()]
+            account_ids = panel_account_ids(s, tenant_id)
 
             for account_id in account_ids:
                 events = load_events(s, account_id)

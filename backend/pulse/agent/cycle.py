@@ -114,9 +114,11 @@ def _make_llm(session: Session, factory, enabled: bool, api_key):
         return factory()
     if not (enabled and api_key):
         return None
+    key = api_key.get_secret_value() if hasattr(api_key, "get_secret_value") else str(api_key)
+    if not key.strip():  # a blank key (even whitespace) is no key
+        return None
     from pulse.agent.llm_drafter import LlmUnavailable, build_llm_drafter
 
-    key = api_key.get_secret_value() if hasattr(api_key, "get_secret_value") else str(api_key)
     calls = session.execute(text("SELECT llm_calls_per_cycle FROM tenant_config")).scalar() or 50
     try:
         return build_llm_drafter(key, model=get_settings().llm_model, max_calls=calls)
