@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "gen:api": "openapi-typescript ../specs/001-renewal-risk-prioritisation/contracts/openapi.yaml -o src/api/schema.d.ts"
+    "gen:api": "openapi-typescript ../specs/001-renewal-risk-prioritisation/contracts/openapi.yaml -o src/api/schema.d.ts",
+    "e2e": "bash ../infra/scripts/e2e.sh"
   },
   "dependencies": {
     "react": "19.1.0",
@@ -15,6 +16,7 @@
     "react-router-dom": "7.6.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
     "@vitejs/plugin-react": "4.5.2",

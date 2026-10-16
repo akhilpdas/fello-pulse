@@ -1,6 +1,8 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import { useSession } from "./lib/session";
+import { navFor } from "./lib/nav";
 import { AccountPage } from "./pages/Account";
+import { AdminPage } from "./pages/Admin";
 import { DraftsPage } from "./pages/Drafts";
 import { LoginPage } from "./pages/Login";
 import { LowConfidencePage } from "./pages/LowConfidence";
@@ -19,7 +21,7 @@ function UserBar() {
 }
 
 export default function App() {
-  const { status } = useSession();
+  const { status, who } = useSession();
   if (status === "loading") return <main><p className="muted">Loading…</p></main>;
   if (status === "anonymous") return <main><LoginPage /></main>;
   return (
@@ -27,10 +29,7 @@ export default function App() {
       <header className="top">
         <strong>Pulse</strong>
         <nav>
-          <NavLink to="/">Queue</NavLink>
-          <NavLink to="/low-confidence">Low confidence</NavLink>
-          <NavLink to="/drafts">Drafts</NavLink>
-          <NavLink to="/runs">Run log</NavLink>
+          {navFor(who?.user.role ?? "csm").map((n) => <NavLink key={n.to} to={n.to} end={n.to === "/"}>{n.label}</NavLink>)}
         </nav>
         <UserBar />
       </header>
@@ -41,6 +40,7 @@ export default function App() {
           <Route path="/accounts/:id" element={<AccountPage />} />
           <Route path="/drafts" element={<DraftsPage />} />
           <Route path="/runs" element={<RunsPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </main>
     </>

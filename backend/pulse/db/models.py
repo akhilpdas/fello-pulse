@@ -573,6 +573,24 @@ class ContactOptOut(TenantScoped, Base):
     __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_contact_opt_out_email"),)
 
 
+class LoginAttempt(Base):
+    """A failed sign-in, keyed by a hash of (address, workspace, email) -- shared state for the login limiter so the
+    allowance holds across API instances.
+
+    Not tenant-scoped, on purpose and declared as such: nobody has a tenant before they have signed in, and a failed
+    attempt against an unknown workspace has none at all. It holds no tenant data -- only a hash and a time -- and is
+    purged as it ages.
+    """
+
+    __tablename__ = "login_attempt"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (Index("ix_login_attempt_key", "key_hash", "at"),)
+
+
 class WorkLease(Base):
     """Crash-safe claiming for the worker.
 
@@ -663,10 +681,10 @@ class Feedback(TenantScoped, Base):
 # drift from the schema.
 from pulse.db.base import TENANT_SCOPED_TABLES  # noqa: E402
 
-GLOBAL_TABLES = ["tenant", "model_version", "work_lease"]
+GLOBAL_TABLES = ["tenant", "model_version", "work_lease", "login_attempt"]
 
 __all__ = [
-    "Account", "Action", "AgentRun", "AppSession", "AppUser", "AuditEvent", "Base", "ContactOptOut", "Feedback", "FeatureSnapshot",
+    "Account", "Action", "AgentRun", "AppSession", "LoginAttempt", "AppUser", "AuditEvent", "Base", "ContactOptOut", "Feedback", "FeatureSnapshot",
     "GLOBAL_TABLES", "IdentityLink", "IngestionWatermark", "ModelVersion", "PlayAllowlist",
     "Score", "SourceEvent", "Suppression", "TENANT_SCOPED_TABLES", "Tenant", "TenantConfig",
     "WorkLease",

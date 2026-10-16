@@ -162,6 +162,13 @@ is labelled so, never presented as test-first. Run the **full** suite (`python3 
 - [ ] T300 Re-run `/speckit-analyze` on 002; resolve every CRITICAL/HIGH or write it down. (Delivery Workflow §4)
 - [ ] T301 Full suites green (`python3 -m pytest -q`, `npm test && npm run build`); ask before committing/pushing.
 
+## Phase 7 — gaps the owner questioned, closed after the main plan (added 2026-10-16)
+
+- [x] T302 [US1] RED+GREEN `frontend/e2e/app.spec.ts` + `playwright.config.ts` + `infra/scripts/e2e.sh` — the real UI driven in real Google Chrome against the real API and a scratch copy of the demo DB: 9 scenarios (sign-in/out, wrong password, operator queue, account actions, operator pages, approving a draft in demo mode, CSM scoping + 403). It found a real bug (the audit panel went stale) fixed in T303. (FR-011, SC-005)
+- [x] T303 [US1] RED+GREEN `frontend/src/pages/Admin.tsx`, `src/api/admin.ts`, `src/lib/nav.ts` (+ tests) — operator pages for outbound settings, opt-outs, users and the audit trail; role-based navigation. (FR-004, FR-009, FR-011, FR-012, FR-014, FR-016)
+- [x] T304 [US1] RED+GREEN `pulse.auth.limiter.PgLoginLimiter` + migration `0006` + `tests/integration/test_pg_login_limiter.py` — login rate limiting shared across API instances; only a hash is stored. Closes the per-process limit stated in R-4. (FR-007)
+- [x] T305 RED+GREEN `pulse.ml.pipeline.panel_account_ids` + `tests/integration/test_panel_order_is_deterministic.py` — the panel was built in physical-layout order, so the same data gave precision@100 0.196–0.326 across rebuilds. Now ordered by external ref. (B-27; constitution: determinism)
+
 ## Dependencies and order
 
 ```text

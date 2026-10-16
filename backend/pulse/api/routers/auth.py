@@ -15,7 +15,7 @@ from sqlalchemy import text
 
 from pulse.api.deps import SESSION_COOKIE, get_clock, get_principal, session_token
 from pulse.auth import audit
-from pulse.auth.limiter import LoginLimiter
+from pulse.auth.limiter import LoginLimiter, PgLoginLimiter
 from pulse.auth.passwords import verify_password
 from pulse.auth.principal import Principal
 from pulse.auth.sessions import create_session, revoke_session
@@ -25,14 +25,14 @@ from pulse.db.session import public_session, tenant_session
 router = APIRouter()
 
 _INVALID = HTTPException(status_code=401, detail="invalid credentials")
-_limiter: LoginLimiter | None = None
+_limiter: LoginLimiter | PgLoginLimiter | None = None
 
 
-def get_limiter() -> LoginLimiter:
+def get_limiter() -> LoginLimiter | PgLoginLimiter:
     global _limiter
     if _limiter is None:
         s = get_settings()
-        _limiter = LoginLimiter(s.login_max_failures, s.login_window_seconds)
+        _limiter = PgLoginLimiter(s.login_max_failures, s.login_window_seconds)  # shared across API instances
     return _limiter
 
 
@@ -46,7 +46,7 @@ class LoginRequest(BaseModel):
 @router.post("/auth/login")
 def login(
     req: LoginRequest, request: Request, response: Response,
-    clock: Clock = Depends(get_clock), limiter: LoginLimiter = Depends(get_limiter),
+    clock: Clock = Depends(get_clock), limiter: LoginLimiter | PgLoginLimiter = Depends(get_limiter),
 ):
     now = clock.now()
     key = (request.client.host if request.client else "unknown", req.workspace.strip().lower(), req.email.strip().lower())
