@@ -31,20 +31,28 @@ sent, send_failed).
 last_seen_at, user_agent)`. Index `(tenant_id, token_hash)`. Lookup is always under the tenant claim (R-2).
 
 **`audit_event`** `(id, tenant_id, at, actor_user_id null, actor_kind {user|system|anonymous}, event
-{login_ok|login_failed|logout|forbidden|tenant_mismatch|role_changed|user_created|user_disabled|config_changed|
-send_attempted|send_blocked...}, subject text null, detail jsonb)`. Append-only (no update/delete grant to
+{login_ok|login_failed|logout|forbidden|tenant_mismatch|user_created|user_enabled|user_disabled|role_changed|password_reset|
+outbound_changed|opt_out_added|opt_out_removed|cycle_run}, subject text null, detail jsonb)`. Append-only (no update/delete grant to
 the app role).
 
 **`contact_opt_out`** `(id, tenant_id, email lower, reason, created_by_user_id, created_at)` unique
 `(tenant_id, email)`.
 
+**`login_attempt`** `(id bigserial, key_hash char(64), at timestamptz)` — added by migration `0006` after the first design.
+A **global** table (declared in `GLOBAL_TABLES`; no `tenant_id`, no RLS) because a sign-in has no tenant until it succeeds. It holds only a
+hash of (address, workspace, email) — or of (address, `*`, `*`) for the per-source limit — and a time; purged as it ages.
+
 ## State transitions — `action.state`
 
 ```
-drafted ──approve──▶ approved ──▶ sending ──ok──▶ sent
+drafted ──approve──▶ approved ──(send)──▶ sent
    │                    │            ├─ transient×3 ─▶ send_failed
    │                    │            ├─ permanent ───▶ send_failed
    │                    │            └─ ambiguous ───▶ send_unconfirmed   (never auto-retried)
+   (approved→outcome happens inside one transaction, so `approved`/`sending` are never visible to another reader;
+    approval is a single conditional UPDATE, which is what makes two simultaneous approvals send once.
+    From send_failed, outbound_disabled, not_configured, no_recipient, opted_out an operator may approve again — the
+    message definitely did not leave. From sent and send_unconfirmed they may not.)
    │                    └─ checks at send time ─▶ not_configured | outbound_disabled | no_recipient | opted_out
    └─reject─▶ rejected
 ```

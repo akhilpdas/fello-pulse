@@ -378,3 +378,18 @@ work_lease                            (global, worker-only)
 | `agent_run` | yes (nullable tenant) | per-tenant cycles are scoped; the orchestration record is global |
 | `model_version` | no | one shared model (B-7); written only by the elevated training path |
 | `work_lease` | no | worker infrastructure, never served to a request |
+
+
+---
+
+## Added by spec 002 (migrations `0005_auth_delivery`, `0006_login_attempt`)
+
+The model above is the 001 schema. Spec 002 added, and `specs/002-production-readiness/data-model.md` is the detailed reference:
+
+- **`app_user`** + `password_hash`, `disabled_at`, `password_changed_at` (scrypt hash with embedded parameters; NULL = cannot sign in).
+- **`account`** + `contact_name`, `contact_email` (from the CRM's `primary_contact`; NULL = no known contact; never a feature).
+- **`tenant_config`** + `outbound_enabled` (false), `sender_address`, `sender_verified` (false), `demo_mode` (true), `test_inbox`, `llm_calls_per_cycle` (50).
+- **`action`** + `redirected_to`, `provider_message_id`, `delivery_error`, `original_subject`, `original_body`, `draft_model`, `draft_fallback_reason`;
+  its `state` gained the outcomes `send_unconfirmed`, `not_configured`, `outbound_disabled`, `no_recipient`, `opted_out`.
+- **New tenant-scoped tables (row-level security, FORCEd):** `app_session`, `audit_event` (append-only for the application role), `contact_opt_out`.
+- **New *global* table (declared, not tenant-scoped):** `login_attempt` — a hash and a time, used by the shared login limiter.

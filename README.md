@@ -56,12 +56,16 @@ images are not scanned or pinned by digest; no TLS terminator is included.
 ## Layout
 
 ```
-backend/pulse/   features/ ml/ scoring/ domain/ agent/ ingest/ api/ db/    (FastAPI + SQLAlchemy + scikit-learn)
+backend/pulse/   features/ ml/ scoring/ domain/ agent/ ingest/ api/ db/ auth/ tools/   (FastAPI + SQLAlchemy + scikit-learn)
+                 auth/ sessions, passwords, login limiter, audit · agent/ cycle, delivery, SMTP transport, LLM drafter · tools/ the fake mail server
 backend/tests/   unit/ integration/ isolation/ leakage/ contract/
 generator/       the simulated estate: 3 tenants, ~5,000 accounts, ~350k events, five sources, 12 data pathologies
-frontend/        React 19 + Vite + TypeScript (queue, account, drafts, run log, low confidence)
-infra/scripts/   pg_bootstrap.sh, run_all.sh
-specs/001-…/     spec, plan, data model, contracts (incl. openapi.yaml), tasks, clarifications
+frontend/        React 19 + Vite + TypeScript (sign-in, queue, account, drafts, run log, low confidence, operator Admin)
+frontend/e2e/    Playwright tests that drive the real UI in real Chrome (`npm run e2e`)
+infra/scripts/   pg_bootstrap.sh, run_all.sh, e2e.sh   ·   infra/docker/ + docker-compose.yml (UNVERIFIED)
+docs/            SOLUTION_BRIEF, DECK (+ Pulse_deck.pptx), LOOM_SCRIPT, VERIFICATION (what was checked, how, and what was not)
+specs/001-…/     the delivered system: spec, plan, data model, contracts (incl. openapi.yaml), tasks, clarifications (B-1…B-29)
+specs/002-…/     production readiness: sign-in, real email, model drafting, containers — spec, plan, research, data model, tasks
 ```
 
 ## What was verified, and what was not

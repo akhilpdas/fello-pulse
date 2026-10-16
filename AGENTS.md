@@ -1,8 +1,9 @@
 # Agent Instructions — Fello Pulse
 
 Read in this order before doing anything: this file, then `HANDOFF.md` (current
-status and environment setup), then `specs/001-renewal-risk-prioritisation/tasks.md`
-(what's next), then `.specify/memory/constitution.md` (the non-negotiables).
+status and environment setup), then the `tasks.md` of the feature in flight —
+`specs/002-production-readiness/tasks.md` (spec 001's is complete, apart from the gaps it lists that 002 closed) —
+then `.specify/memory/constitution.md` (the non-negotiables).
 
 ## Test-driven development is mandatory, starting Phase 5
 

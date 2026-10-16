@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-16
 
-**Status**: Draft
+**Status**: Implemented (all 108 tasks done). Not verified, and stated as such in `README.md`: any real email or model call, and the containers. Where the build differs from this text it is called out inline (FR-001, FR-018, FR-021).
 
 **Input**: User description: "Close the four gaps that were wrongly listed as 'deliberately skipped' in Pulse: real outbound email, live LLM drafting, containerised one-command deployment, and an authentication system apt for this application. Strict TDD; ambiguity in clarifications.md; dropped scope written down."
 

@@ -619,10 +619,13 @@ distribution, with the data seed and model version recorded.
   oversight.
 - Email send transport is abstracted behind an interface with a recording
   implementation. Real delivery, bounce handling and reply threading are out of scope
-  and named as such.
+  and named as such. **[Partly superseded by spec 002: a real SMTP transport, send gate,
+  demo mode and opt-outs now exist; bounce handling and reply threading remain out of scope.]**
 - Authentication is a signed bearer token carrying tenant and user claims. A real
   identity provider is out of scope; the tenant claim path it feeds is real, because
-  that is the part isolation depends on.
+  that is the part isolation depends on. **[Superseded by spec 002: real sign-in with
+  opaque server-side sessions; the tenant claim now comes from a verified session, not a
+  header. SSO/MFA remain out of scope. See clarifications B-28.]**
 - Time is injectable throughout. Nothing calls the system clock directly, because a
   system whose correctness depends on "now" cannot be tested for point-in-time
   behaviour.

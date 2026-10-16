@@ -78,7 +78,9 @@ Each exists because a requirement claims to handle it.
 ## Per-source payloads
 
 **salesforce** — `crm.account_updated`: `{name, segment, industry?, region?, seats?,
-acv_cents?, renewal_date?, owner_ref?, plan | plan_name}`.
+acv_cents?, renewal_date?, owner_ref?, primary_contact?: {name, email} | null, plan | plan_name}`.
+`primary_contact` was added by spec 002 (null / absent = the CRM holds no contact; it is never defaulted, and it is
+never read by feature code). The latest `crm.account_updated` wins, including a null.
 `crm.opportunity_stage_changed`: `{opportunity_ref, stage, amount_cents}`.
 `crm.owner_changed`: `{from_owner_ref, to_owner_ref}`.
 `crm.meeting_logged`: `{kind: "qbr"|"checkin"|"training", attendees}`.

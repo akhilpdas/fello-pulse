@@ -1,7 +1,12 @@
 # Handoff / Resume Notes
 
 This file is the restart point if a session ends. It is updated at the end of every
-phase. Read it first, then `specs/001-renewal-risk-prioritisation/tasks.md`.
+phase. Read it first, then `specs/001-renewal-risk-prioritisation/tasks.md` and
+`specs/002-production-readiness/tasks.md`.
+
+> **Current state is the section titled "CLOSED OUT" near the bottom** (and `README.md`'s "What was verified" / "Gaps").
+> Everything above it is dated history, kept because it explains *why* things are as they are — some of it
+> (e.g. "no authentication", "header identity", "0.33") was true then and is not now.
 
 ## Where this lives
 

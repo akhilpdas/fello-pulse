@@ -44,3 +44,14 @@ The machine-readable contract (`specs/001-…/contracts/openapi.yaml`) is regene
 
 `GET /actions` rows gain `draft_source`, `draft_model`, `draft_fallback_reason`, and, when a human edited
 it, `original_subject` / `original_body`.
+
+## Rate limiting (added during the build)
+
+`POST /auth/login` is limited per (address, workspace, email) **and** per source address across all accounts (password spraying), shared across API
+instances. Over the limit → 429 with the same body regardless of whether the account exists. Settings: `PULSE_LOGIN_MAX_FAILURES`,
+`PULSE_LOGIN_MAX_FAILURES_PER_ADDRESS`, `PULSE_LOGIN_WINDOW_SECONDS`.
+
+## Command line (not part of the HTTP contract)
+
+`python3 -m pulse.cli serve [--simulate-present]` the unattended worker · `bootstrap-demo` the container path's `run_all.sh` ·
+`send-test --to <address>` one labelled test message through the configured SMTP provider (the way to verify real email).

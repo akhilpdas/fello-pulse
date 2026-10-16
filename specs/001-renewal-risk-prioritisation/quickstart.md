@@ -56,6 +56,8 @@ views; click an account for drivers, evidence down to source payloads, and score
 ```bash
 cd backend && source .venv/bin/activate && python3 -m pytest -q      # backend (needs pulse_test, below)
 cd frontend && npm test && npm run build                              # frontend
+cd frontend && npm run e2e                                            # the real UI in real Chrome (needs the demo DB and Chrome)
+python3 -m pulse.cli send-test --to <you>                              # real email, once PULSE_SMTP_* is set (never yet run)
 python3 -m pulse.openapi_export                                       # regenerate contracts/openapi.yaml
 ```
 
