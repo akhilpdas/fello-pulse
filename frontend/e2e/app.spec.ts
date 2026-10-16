@@ -45,11 +45,13 @@ test("a wrong password is refused with one generic message", async ({ page }) =>
 let operatorBelowCut = 0;
 
 test("an operator signs in and sees the whole tenant's queue, and the Admin page", async ({ page }) => {
+  const started = Date.now();
   await signIn(page, OPERATOR);
   await expect(page.getByText(/Dana Okafor · operator · northwind/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "This week's queue" })).toBeVisible();
   const rows = page.locator("table tbody tr");
   await expect(rows.first()).toBeVisible();
+  expect(Date.now() - started, "SC-005: sign-in to a working queue").toBeLessThan(30_000);
   expect(await rows.count()).toBeGreaterThan(0);
   expect(await rows.count()).toBeLessThanOrEqual(12);
   await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
@@ -61,6 +63,7 @@ test("an account shows its drivers and evidence, and the CSM's judgement is reco
   await signIn(page, OPERATOR);
   const first = page.locator("table tbody tr").first().getByRole("link");
   const name = await first.innerText();
+  const href = await first.getAttribute("href"); // account names repeat within a tenant, so identify it by its link
   await first.click();
   await expect(page.getByRole("heading", { name: new RegExp(name) })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What is driving it" })).toBeVisible();
@@ -76,7 +79,7 @@ test("an account shows its drivers and evidence, and the CSM's judgement is reco
   await page.getByRole("link", { name: "Queue" }).click();
   await expect(page.getByRole("heading", { name: "This week's queue" })).toBeVisible();
   await expect(page.locator("table tbody tr").first()).toBeVisible();
-  await expect(page.locator("table tbody a", { hasText: new RegExp(`^${name}$`) })).toHaveCount(0); // gone from the queue
+  await expect(page.locator(`table tbody a[href="${href}"]`)).toHaveCount(0); // that account is gone from the queue
 });
 
 test("an operator sets up outbound email, manages opt-outs and users, and the audit trail records it", async ({ page }) => {
@@ -120,15 +123,21 @@ test("approving a draft never reaches a customer in demo mode, and says so", asy
   await expect(cards.first()).toBeVisible();
   await expect(cards.first().getByText("Waiting for your review.")).toBeVisible();
 
-  // Approve a handful (about one in ten accounts has no contact and would be blocked, so one is not enough).
-  for (let i = 0; i < 6; i++) {
+  // Some accounts have no known contact (about 1 in 9 drafts) and are correctly blocked, and they cluster together in
+  // the list -- so keep approving until one is delivered (here: captured, because demo mode is on), rather than
+  // assuming the first few have an address.
+  const sentCount = () => page.evaluate(async () => (await (await fetch("/api/actions?state=sent", { credentials: "include" })).json()).rows.length);
+  let approved = 0;
+  while ((await sentCount()) === 0 && approved < 60) {
     const [response] = await Promise.all([
       page.waitForResponse((r) => r.url().includes("/approve") && r.request().method() === "POST"),
       page.locator("article.draft").first().getByRole("button", { name: "Approve & send" }).click(),
     ]);
     expect(response.status()).toBe(200);
+    approved += 1;
     await page.waitForLoadState("networkidle");
   }
+  expect(await sentCount(), `none of ${approved} approved drafts was delivered`).toBeGreaterThan(0);
   await page.getByLabel("Show").selectOption("sent");
   await expect(page.getByText("Demo mode: captured but not delivered — no customer was emailed.").first()).toBeVisible();
   await expect(page.getByText("Sent to the customer.")).toHaveCount(0); // nothing real was sent

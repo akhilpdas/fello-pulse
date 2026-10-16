@@ -123,3 +123,27 @@ stand-in for the provider. The `AnthropicClient` adapter (about fifteen lines ov
 `pip install -e ".[llm]"`, then `PULSE_LLM_ENABLED=true PULSE_LLM_API_KEY=… python3 -m pulse.cli cycle` and read the drafts in
 the UI (`draft_source: llm`, with the model name). A model could pass this validator and still write something awkward: the
 validator guarantees *traceability*, not good prose, which is why drafts are still reviewed by a human.
+
+## 2026-10-17 — closing pass on spec 002
+
+**`/speckit-analyze` re-run on spec 002** (36 FR, 13 SC, 108 tasks; every requirement is cited by a task). Findings and what was done:
+
+| Finding | Severity | Resolution |
+|---|---|---|
+| FR-007 asks for rate limiting "per identity *and per source*"; only per (address, workspace, email) existed, so password spraying never tripped it | HIGH | address-wide limit added (`test_login_spraying`, shown red without it, green with it) |
+| FR-001/SC-002 claimed "no tenant-scoped work" for refused requests, but resolving a session reads the session table under the (untrusted) claimed tenant | MEDIUM | spec reworded to "no *data* work"; behaviour unchanged and tested |
+| FR-021 said provider credentials "per tenant"; built as deployment-level credentials with a per-tenant sender address | MEDIUM | spec reworded to match; gap recorded (B-29, README) |
+| `tasks.md` totals were stale (104 vs 108) | LOW | recomputed |
+| SC-005 (sign-in to a working queue < 30 s) was not measured | MEDIUM | now asserted in the browser suite (it takes well under a second) |
+| Edge case "model reply in the wrong language" has no check | LOW | open — the validator checks numbers, links, markup, instructions and claims, not language |
+
+**The failing reconcile test** was not a SHAP defect. Attribution reconciles to the model's logit to floating-point noise (~1e-15, new strict unit test, mutation-verified). The integration check compares the *stored* probability, which has
+5 decimals, so rounding alone can move the log-odds by up to 5e-6/(p(1−p)) — ~3e-4 at p=0.016. The old fixed 1e-4 only worked for probabilities near 0.5, and its account-picking query had no `ORDER BY`, so a rebuild changed which account it
+tested. The tolerance now follows p, and the account is chosen deterministically.
+
+**Browser suite** (`npm run e2e`, real Google Chrome, scratch copy of the demo DB): 9 scenarios, run three times in a row — stable. Two failures along the way were both test bugs, not product bugs: it matched an account by *name* (names repeat),
+and it assumed the first few drafts had a contact (≈1 in 9 do not, and they cluster). The demo database was confirmed untouched after every run.
+
+**Deck:** `docs/Pulse_deck.pptx` rebuilt with the real top of the signed-in queue (the builder signs in; tested against a stand-in server). Only slide 1 has ever been rendered to an image (macOS Quick Look); slides 2–11 are text and one table, checked programmatically.
+
+**Totals at the end:** backend 436 · frontend 34 · browser 9. Nothing pushed.

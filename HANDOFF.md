@@ -586,19 +586,11 @@ embed the live queue).
 
 ---
 
-## RESUME HERE (paused 2026-10-16 at the usage limit)
+## CLOSED OUT (2026-10-17)
 
-**State:** everything is committed except nothing — see `git log`. Backend 431 passed / **1 failing**, frontend 34 passed, browser 9 passed (before the last changes; re-run `npm run e2e`).
+The "resume here" items are done: the failing reconcile test was a rounding/ordering problem in the test, not a defect (fixed and explained in `docs/VERIFICATION.md`); address-wide login limiting added; spec 002 reworded where
+it overclaimed; deck rebuilt with the signed-in queue; browser suite stable (3 runs). **Backend 436 · frontend 34 · browser 9, all passing.** All tasks in `specs/002-production-readiness/tasks.md` are ticked.
 
-**The one failing test, and why it is not a product bug:** `tests/integration/test_evidence_trail.py::test_contributions_reconcile_to_the_models_own_output` — SHAP contributions vs the model's logit are out
-by 1.3e-4 against a 1e-4 tolerance. The test picks `... GROUP BY a.id HAVING count(*) > 100 LIMIT 1` with **no ORDER BY**, so after the database was rebuilt it picked a different account (same family of
-bug as B-27). Next steps: (1) add `ORDER BY a.external_ref` to that helper so it is deterministic; (2) the 1e-4 tolerance is tighter than float32 tree arithmetic justifies — loosen to ~5e-4 *with a comment saying why*,
-or measure the error over many accounts first; do not just widen it silently.
-
-**Just added, uncommitted-until-this-commit:** address-wide login limiting against password spraying (FR-007 "per identity *and per source*"; `test_login_spraying.py`, red without the fix, green with it;
-tests now clear the shared `login_attempt` table before each test).
-
-**Still to do (small):** tick T296–T301 in `specs/002-production-readiness/tasks.md` once the suite is green; edit spec 002 FR-001/SC-002 and FR-021 to match what was built (the token's tenant prefix selects the
-claim for the session lookup, so "no database work under any tenant claim" is really "no *data-route* work"; provider credentials are deployment-level, only the sender address is per tenant); rebuild
-`docs/Pulse_deck.pptx` with the live queue (`python3 docs/build_deck.py --api http://127.0.0.1:8000 --tenant <id> --user <id>` is stale: it needs a session now — extend it to sign in); run `npm run e2e`;
-then ask the owner whether to `git push origin main` (six commits are unpushed).
+**What is still not done or not verified** is listed in `README.md` ("What was verified", "Gaps"): no real email or LLM provider call has ever been made; containers never built (no Docker here); no SSO/MFA; bounces and replies unprocessed;
+lead time and SC-005/006 (model quality) unmet; Loom is a script not a recording; no hosted URL; account names are not unique and drafts for CRM-less accounts greet by reference.
+**Unpushed:** seven commits ahead of `origin/main` — pushing is the owner's call.

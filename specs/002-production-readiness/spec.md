@@ -213,7 +213,10 @@ a machine, the packaging is described as unverified.**
 
 - **FR-001**: Every route that reads or writes tenant data MUST require a verified credential; a
   request without one, or with an invalid, expired or tampered one, MUST be refused as
-  unauthenticated before any tenant-scoped work is done.
+  unauthenticated before any *data* work is done for it. (Resolving a session necessarily reads the session
+  table under the tenant claim the token names; that claim is untrusted and row-level security hides every row
+  that is not that tenant's, so a forged one finds nothing — research R-2. No query against account, score, action
+  or any other data table runs for an unauthenticated request.)
 - **FR-002**: The tenant, user and role for a request MUST come only from the verified credential.
   A tenant id, user id or role supplied by the caller in any other way (header, query, body) MUST
   have no effect on the result, and a mismatch MUST be recorded as a security event.
@@ -269,8 +272,10 @@ a machine, the packaging is described as unverified.**
   configured test inbox (or captured without delivery), marked as redirected, never to a real
   contact. Demo mode MUST be the default for any database populated by the data generator.
 - **FR-021**: Credentials for the email provider MUST be supplied by configuration outside the
-  codebase and database dumps, MUST NOT appear in logs, run records or API responses, and MUST be
-  per tenant where a tenant sends from its own identity.
+  codebase and database dumps and MUST NOT appear in logs, run records or API responses. **As built, the provider
+  credentials are deployment-level (environment); what is per tenant is the verified sender *address*.**
+  Per-tenant provider credentials were not built — storing a secret per tenant at rest is a problem this
+  work does not solve (clarifications B-29, README "Gaps").
 - **FR-022**: The recording implementation MUST remain, and remain the default for tests and the
   demo, so the whole system runs with no provider configured (as Principle II requires of the LLM).
 - **FR-023**: The data generator and ingestion MUST carry a primary customer contact per account
@@ -343,7 +348,8 @@ a machine, the packaging is described as unverified.**
   attempts to read or act on another tenant's data or as another user fail, across every route, verified
   by a test that iterates over all routes.
 - **SC-002**: **100%** of data routes refuse an unauthenticated, expired or tampered request, and **0**
-  tenant-scoped database operations occur for such requests.
+  data-route (non-session) tenant-scoped operations occur for such requests — verified by
+  `test_identity_forgery` (no data-route session is opened) and the every-route sweep.
 - **SC-003**: A `csm` is refused on **100%** of operator-only routes, and an operator is not refused on
   any of them.
 - **SC-004**: Every approval, rejection and edit in the audit trail names the authenticated user;

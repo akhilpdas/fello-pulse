@@ -1,16 +1,19 @@
 """Build docs/Pulse_deck.pptx from docs/DECK.md (one slide per `##`).
 
-    python3 docs/build_deck.py [--api http://127.0.0.1:8000 --tenant <uuid> --user <uuid>]
+    python3 docs/build_deck.py [--api http://127.0.0.1:8000 --workspace northwind --email csm00@northwind.example.com]
 
-With --api/--tenant/--user the "Monday queue" slide carries the real top of the queue pulled from
-the running system (so the slide is evidence, not a mock-up); without them it says what to look at.
+With --api/--workspace/--email the "Monday queue" slide carries the real top of the queue pulled from the running
+system (so the slide is evidence, not a mock-up). It signs in; the password is read from PULSE_DEMO_PASSWORD or
+.demo-credentials.pulse. Without them the deck is text only.
 Needs python-pptx (the `dev` extra).
 """
 
 from __future__ import annotations
 
 import argparse
+import http.cookiejar
 import json
+import os
 import re
 import urllib.request
 from pathlib import Path
@@ -29,9 +32,16 @@ def parse(md: str) -> list[tuple[str, str]]:
             for m in re.finditer(r"^## (.+?)\n(.*?)(?=^## |\Z)", md, re.S | re.M)]
 
 
-def fetch_queue(api: str, tenant: str, user: str) -> dict:
-    req = urllib.request.Request(f"{api}/queue", headers={"X-Tenant-Id": tenant, "X-User-Id": user})
-    with urllib.request.urlopen(req, timeout=15) as r:
+def fetch_queue(api: str, workspace: str, email: str, password: str) -> dict:
+    """Sign in like any client (the session cookie is the only identity), then read the queue."""
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    login = urllib.request.Request(
+        f"{api}/auth/login", method="POST", headers={"Content-Type": "application/json"},
+        data=json.dumps({"workspace": workspace, "email": email, "password": password}).encode())
+    with opener.open(login, timeout=15):
+        pass  # a wrong password raises HTTPError 401 here -- better a loud failure than an empty deck
+    with opener.open(urllib.request.Request(f"{api}/queue"), timeout=15) as r:
         return json.load(r)
 
 
@@ -56,7 +66,8 @@ def queue_table(slide, queue: dict) -> None:
     for i, r in enumerate(rows, start=1):
         delta = "—" if r["delta"] is None else f"{r['delta']:+.2f}"
         vals = [r["account_name"], r["tier"], f"{r['probability']:.0%}",
-                f"${r['value_at_risk_cents'] / 100:,.0f}", f"{r['days_to_renewal']:.0f} d",
+                f"${r['value_at_risk_cents'] / 100:,.0f}",
+                f"overdue {abs(r['days_to_renewal']):.0f} d" if r["days_to_renewal"] < 0 else f"{r['days_to_renewal']:.0f} d",
                 r["dominant_driver"].replace("_", " "), delta]
         for j, v in enumerate(vals):
             cell = table.cell(i, j)
@@ -98,9 +109,11 @@ def build(slides: list[tuple[str, str]], queue: dict | None, out: Path) -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--api"), ap.add_argument("--tenant"), ap.add_argument("--user")
+    ap.add_argument("--api"), ap.add_argument("--workspace"), ap.add_argument("--email")
     ap.add_argument("--out", default=str(HERE / "Pulse_deck.pptx"))
     a = ap.parse_args()
-    q = fetch_queue(a.api, a.tenant, a.user) if a.api and a.tenant and a.user else None
+    password = os.environ.get("PULSE_DEMO_PASSWORD") or (HERE.parent / ".demo-credentials.pulse").read_text().strip() \
+        if a.api else ""
+    q = fetch_queue(a.api, a.workspace, a.email, password) if a.api and a.workspace and a.email else None
     build(parse((HERE / "DECK.md").read_text()), q, Path(a.out))
     print(f"wrote {a.out} ({'with live queue' if q else 'text only'})")

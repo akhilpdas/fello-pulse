@@ -66,7 +66,7 @@ specs/001-…/     spec, plan, data model, contracts (incl. openapi.yaml), tasks
 
 ## What was verified, and what was not
 
-**Automated, and re-run before each commit:** backend suite (`python3 -m pytest -q`, 430 tests, against its own `pulse_test` database — never the demo one),
+**Automated, and re-run before each commit:** backend suite (`python3 -m pytest -q`, 436 tests, against its own `pulse_test` database — never the demo one),
 frontend unit tests (`npm test`, 34), and **9 browser scenarios in real Google Chrome** against the real API and a scratch copy of the demo data
 (`npm run e2e`: sign-in/out, a wrong password, the operator queue, account feedback and suppression, the operator pages, approving a draft in demo mode,
 CSM scoping and the server refusing the admin API). The OpenAPI contract has a drift test. **Mutation-checked** (each protection removed, a named test goes red):
@@ -110,6 +110,8 @@ about 105 s against a 15-minute interval), SC-008–SC-014. **Not met — SC-005
 - **Email:** bounces, complaints and replies are not processed, so a hard bounce is unknown and an opt-out sent by reply must be entered by an operator. SMTP credentials are deployment-level, not
   per tenant. No contact import.
 - **Model:** lead time is not reported and the planted retrospective accounts are missed (above); no per-tenant model; the cold-start result for small tenants is weak.
+- **Data quality:** account names are not unique within a tenant (309 repeated names in the Northwind demo estate, as in a real CRM) and the queue shows no disambiguator; accounts the CRM has no record of are drafted
+  for and greeted by their external reference ("Hi northwind-01261") — the send gate blocks them (no contact) but a CSM still sees such drafts, about 11% of the list.
 - **Operations:** a whole-tenant cycle is one transaction (one bad account fails the tenant's cycle); a persistently failing tenant is retried every 30 s with no backoff; login attempts and
   the audit trail are not exported or paginated beyond the last 200 events.
 - **Containers:** written and statically checked, never built (see *Containers*).

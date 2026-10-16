@@ -155,12 +155,12 @@ is labelled so, never presented as test-first. Run the **full** suite (`python3 
 
 ## Phase 6 — Honesty and delivery
 
-- [ ] T296 Rebuild `pulse` and `pulse_test` with `run_all.sh` (the generator changed, so the estate changed — R-8); re-run training; **re-quote every metric** (precision@100, ROC-AUC, captured value, cycle time) in `README.md`, `docs/SOLUTION_BRIEF.md`, `docs/DECK.md`, `HANDOFF.md`, and rebuild `docs/Pulse_deck.pptx`. (R-8, SC-013)
-- [ ] T297 Split `README.md` "Deliberately skipped" into **Decisions (with reasons)** and **Gaps (not done)**; add what 002 closed and what it did not (SSO, MFA, self-service reset, bounce/reply handling, per-tenant SMTP secrets at rest, shared login limiter, live LLM/real inbox are manual checks, containers unverified). (FR-036, SC-013)
-- [ ] T298 `clarifications.md`: entries for sessions-over-JWT, workspace login, contacts source, SMTP limits, opt-out limits, FR-018 deviation, per-process limiter, demo-mode default, token-prefix design. (FR-036)
-- [ ] T299 `HANDOFF.md` status + `docs/VERIFICATION.md` (what was mutation-verified, what was GUARD-only, what is unverified). (AGENTS.md)
-- [ ] T300 Re-run `/speckit-analyze` on 002; resolve every CRITICAL/HIGH or write it down. (Delivery Workflow §4)
-- [ ] T301 Full suites green (`python3 -m pytest -q`, `npm test && npm run build`); ask before committing/pushing.
+- [x] T296 Rebuild `pulse` and `pulse_test` with `run_all.sh` (the generator changed, so the estate changed — R-8); re-run training; **re-quote every metric** (precision@100, ROC-AUC, captured value, cycle time) in `README.md`, `docs/SOLUTION_BRIEF.md`, `docs/DECK.md`, `HANDOFF.md`, and rebuild `docs/Pulse_deck.pptx`. (R-8, SC-013)
+- [x] T297 Split `README.md` "Deliberately skipped" into **Decisions (with reasons)** and **Gaps (not done)**; add what 002 closed and what it did not (SSO, MFA, self-service reset, bounce/reply handling, per-tenant SMTP secrets at rest, shared login limiter, live LLM/real inbox are manual checks, containers unverified). (FR-036, SC-013)
+- [x] T298 `clarifications.md`: entries for sessions-over-JWT, workspace login, contacts source, SMTP limits, opt-out limits, FR-018 deviation, per-process limiter, demo-mode default, token-prefix design. (FR-036)
+- [x] T299 `HANDOFF.md` status + `docs/VERIFICATION.md` (what was mutation-verified, what was GUARD-only, what is unverified). (AGENTS.md)
+- [x] T300 Re-run `/speckit-analyze` on 002; resolve every CRITICAL/HIGH or write it down. (Delivery Workflow §4)
+- [x] T301 Full suites green (`python3 -m pytest -q`, `npm test && npm run build`); ask before committing/pushing.
 
 ## Phase 7 — gaps the owner questioned, closed after the main plan (added 2026-10-16)
 
@@ -193,5 +193,5 @@ Phase 0 (gaps)  ─┐
 
 ## Counts
 
-Total **108 tasks** (T201–T305, plus T215a and T269a).
+Total **108 tasks**, **108 done**. Guards (pass on first run, not test-first): T231, T253, T268\*, T284\*, T285, T295 and the reconcile/empty-key guards added later.
 Of these, tasks labelled GUARD (expected to pass immediately, not test-first): T231, T253, T268\*, T284\*, T285, T295 (\* if it passes first time).

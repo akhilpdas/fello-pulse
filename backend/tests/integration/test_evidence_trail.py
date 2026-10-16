@@ -38,7 +38,7 @@ def _northwind_account_with_history():
         account_id = s.execute(
             text(
                 "SELECT a.id FROM account a JOIN source_event e ON e.account_id = a.id"
-                " WHERE a.tenant_id = :t GROUP BY a.id HAVING count(*) > 100 LIMIT 1"
+                " WHERE a.tenant_id = :t GROUP BY a.id HAVING count(*) > 100 ORDER BY a.external_ref LIMIT 1"
             ),
             {"t": tenant_id},
         ).scalar()
@@ -115,4 +115,10 @@ def test_contributions_reconcile_to_the_models_own_output():
     raw_prob = float(row["probability_raw"])
     reconstructed_logit = sum(row["contributions"].values()) + expected_value(model)
     actual_logit = math.log(raw_prob / (1 - raw_prob))
-    assert abs(reconstructed_logit - actual_logit) < 1e-4
+    # The attribution is exact in memory (tests/unit/test_explain_reconciles_exactly.py); what is compared here is the
+    # *stored* probability, which has 5 decimals (Numeric(6,5)). A half-unit of rounding, 5e-6, moves the log-odds by
+    # up to 5e-6 / (p(1-p)) -- about 3e-4 at p = 0.016 -- so the bound must follow p instead of being a constant that
+    # only holds for probabilities near 0.5 (which is how this test once passed on one account and failed on another).
+    rounding_bound = 0.5e-5 / (raw_prob * (1 - raw_prob))
+    assert abs(reconstructed_logit - actual_logit) <= rounding_bound * 1.01 + 1e-9, (
+        f"off by {abs(reconstructed_logit - actual_logit):.2e}, more than storage rounding explains ({rounding_bound:.2e})")
