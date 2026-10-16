@@ -88,8 +88,18 @@ def test_the_entrypoint_waits_for_the_database_and_migrates_only_for_the_api():
     assert "alembic" in ep and "upgrade head" in ep and "MIGRATE" in ep
 
 
-def test_every_document_that_mentions_the_containers_says_they_are_unverified():
-    for doc in ("README.md", "HANDOFF.md"):
+def test_the_documents_say_exactly_what_was_verified_about_the_containers_and_what_was_not():
+    """The containers were built and run on 2026-10-17 (Colima, Apple-silicon, linux/arm64). Documents must say *that*, and
+    name what was not checked -- not keep calling it unverified, and not claim more than was done."""
+    readme = (ROOT / "README.md").read_text()
+    section = readme[readme.index("## Containers"):readme.index("## Layout")]
+    for evidence in ("Colima", "arm64", "bootstrap-demo", "browser"):
+        assert evidence in section, f"README's Containers section does not mention {evidence}"
+    assert re.search(r"amd64.*not|not.*amd64", section, re.I | re.S), "must say the amd64 build was not checked"
+    for stale in ("never been built", "never built", "UNVERIFIED", "Docker is not installed"):
+        assert stale not in section, f"stale claim in README Containers section: {stale!r}"
+    for doc in ("docs/SOLUTION_BRIEF.md", "docs/DECK.md"):  # current-state documents must not say "never built"
         text = (ROOT / doc).read_text()
-        section = re.findall(r"(?is)(?:docker|container)[^\n]*\n(?:.*\n){0,12}", text)
-        assert section and any("unverified" in s.lower() for s in section), f"{doc} does not label the container path unverified"
+        assert "never built" not in text and "never been built" not in text, doc
+    handoff = (ROOT / "HANDOFF.md").read_text()  # dated history is kept, but must carry the superseding section
+    assert "Containers verified (2026-10-17)" in handoff and "supersedes every earlier" in handoff

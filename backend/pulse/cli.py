@@ -141,33 +141,49 @@ def cmd_cycle(args) -> int:
     return 0
 
 
-def cmd_serve(args) -> int:
-    """The unattended worker: tick every few seconds, cycle each tenant when it is due.
-    ``--simulate-present`` runs on the data's present (its newest event) and lets it advance in
-    real time -- the demo data is dated later than the wall clock. Thin wrapper over worker.serve."""
-    from pulse.agent.transport import select_transport
-    from pulse.agent.worker import build_runtime, serve
-    from pulse.config import OffsetClock, SystemClock, get_settings
-    from pulse.db.session import elevated_session
-    from pulse.ml.pipeline import trainable_tenants
+def _load_promoted(artifacts: str):
     from pulse.ml.registry import load_promoted_model
 
-    model, version = load_promoted_model(Path(args.artifacts))
-    with elevated_session() as s:
-        tenants = trainable_tenants(s)
-    runtimes = [build_runtime(tid, model=model, model_version=version, transport=select_transport(get_settings()))
-                for tid, _ in tenants]
-    clock = SystemClock()
-    if args.simulate_present:
+    return load_promoted_model(Path(artifacts))
+
+
+def cmd_serve(args) -> int:
+    """The unattended worker: tick every few seconds, cycle each tenant when it is due.
+
+    Runtimes are resolved every tick (the promoted model, the ingested tenants), so a worker started before the first
+    bootstrap *waits* and then picks everything up with no restart. ``--simulate-present`` runs on the data's present
+    (its newest event) and lets it advance in real time -- the demo data is dated later than the wall clock. Thin wrapper
+    over worker.serve."""
+    from pulse.agent.transport import select_transport
+    from pulse.agent.worker import build_runtime, serve
+    from pulse.config import LazyOffsetClock, SystemClock, get_settings
+    from pulse.db.session import elevated_session
+    from pulse.ml.pipeline import trainable_tenants
+
+    def resolve():
+        model, version = _load_promoted(args.artifacts)  # LookupError until a model has been promoted
+        with elevated_session() as s:
+            tenants = trainable_tenants(s)
+        if not tenants:
+            raise LookupError("no ingested tenants yet")
+        transport = select_transport(get_settings())
+        return [build_runtime(tid, model=model, model_version=version, transport=transport) for tid, _ in tenants]
+
+    def newest_event():
         with owner_session() as s:
-            newest = s.execute(text("SELECT max(received_at) FROM source_event")).scalar()
-        clock = OffsetClock(base=clock, offset=newest - clock.now())
+            return s.execute(text("SELECT max(received_at) FROM source_event")).scalar()
+
+    clock = LazyOffsetClock(SystemClock(), newest_event) if args.simulate_present else SystemClock()
     settings = get_settings()
-    print(f"pulse worker: {len(runtimes)} tenants, model {version}, cycle every "
-          f"{settings.cycle_interval_minutes} min, tick {settings.worker_tick_seconds}s, "
-          f"clock now {clock.now().isoformat()}  (Ctrl-C to stop)", flush=True)
     try:
-        serve(runtimes, clock=clock, max_ticks=args.max_ticks)
+        ready = resolve()
+        status = f"{len(ready)} tenants, model ready"
+    except LookupError as exc:
+        status = f"waiting ({exc}); will keep checking"
+    print(f"pulse worker: {status}; cycle every {settings.cycle_interval_minutes} min, "
+          f"tick {settings.worker_tick_seconds}s  (Ctrl-C to stop)", flush=True)
+    try:
+        serve(resolve, clock=clock, max_ticks=args.max_ticks)
     except KeyboardInterrupt:
         print("stopped")
     return 0
@@ -222,6 +238,8 @@ def cmd_bootstrap_demo(args) -> int:
         print(f"  password: {password}   (shown once; set PULSE_DEMO_PASSWORD to choose your own)")
     else:
         print("  password: the one you supplied")
+    print("  Note: if the worker is running it starts scoring as soon as the model exists, so the queue may still be "
+          "filling in -- give it a couple of minutes if it looks empty.")
     return 0
 
 

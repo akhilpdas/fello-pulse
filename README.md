@@ -35,23 +35,30 @@ The five constitutional non-negotiables and the test that proves each:
 4. **Tenant isolation below the application** — Postgres row-level security, `FORCE`d, on all 13 tenant tables; the app role is `NOBYPASSRLS`; the tenant claim is transaction-local. *Tests:* `tests/isolation/`, mutation-verified (`docs/VERIFICATION.md`).
 5. **Nothing unexplained reaches a human** — every score persists with SHAP drivers and resolvable evidence ids; drafts are grounding-validated before anyone sees them. *Tests:* evidence trail, score diff, grounding validation.
 
-## Containers — UNVERIFIED
+## Containers — built and run on one machine
 
-`docker-compose.yml` + `infra/docker/` define the database, API, the unattended worker and the web app. **Treat this as
-unverified: none of it has ever been built or run** (Docker is not installed on the dev machine). What *is* checked,
-without a container runtime, by `tests/unit/test_container_files.py`: dependency ordering and healthchecks, the
-database in a named volume and not published to the network, no secrets or generated data baked into an image,
-a non-root user, and a build context that excludes data, models, `.env` and credentials. To try it:
+`docker-compose.yml` + `infra/docker/` define the database, API, the unattended worker and the web app. **Verified on 2026-10-17 on a Mac
+(Apple silicon, macOS 26) using Colima — i.e. linux/arm64 — and nowhere else:**
+- all three images **build** (api and worker 882 MB, web 92 MB); the processes run as non-root (uid 10001 / nginx); no data, models, `.env` or credential
+  is in any image, and no credential-named variable is baked into one;
+- `docker compose up` brings the stack healthy: Postgres, then the API (which runs the migrations), the worker, and nginx;
+- the **worker waits** when there is no model yet and picks the model and tenants up by itself once they exist (this crash-looped on the first run — found by
+  running it, fixed test-first);
+- `docker compose run --rm api python3 -m pulse.cli bootstrap-demo` builds the whole estate inside the container: 347,740 events, and **ROC-AUC 0.690, precision@100
+  0.289 — identical to the host build** (different OS, Python 3.13 vs 3.14, different database);
+- the **9 browser scenarios pass in real Chrome against the containers** (`infra/scripts/e2e_docker.sh`), through nginx;
+- data survives `docker compose down` / `up` (volumes), and a restarted stack signs in and serves the same queue.
 
 ```bash
 docker compose up --build
-docker compose run --rm api python3 -m pulse.cli bootstrap-demo     # builds the demo estate; prints the sign-in
+docker compose run --rm api python3 -m pulse.cli bootstrap-demo     # builds the demo estate; prints the sign-in once
 # open http://localhost:5173
 ```
 
-When someone runs this on a machine with Docker, record the outcome in `HANDOFF.md` and remove this label. Known limits:
-the application roles' passwords are fixed by migration 0002 (development defaults — change before exposing anything);
-images are not scanned or pinned by digest; no TLS terminator is included.
+**Not verified:** a **linux/amd64** build (only arm64 was built — Python wheels such as shap/numba/scikit-learn are the likeliest thing to differ); the spec's
+"under ten minutes from a clean machine" timing (SC-012 — not measured); image vulnerability scans; running with a real provider or a real model key inside the
+stack. Known limits: the application database roles' passwords are fixed by migration 0002 (development defaults — change before exposing anything); images are not
+pinned by digest; there is no TLS terminator.
 
 ## Layout
 
@@ -62,7 +69,7 @@ backend/tests/   unit/ integration/ isolation/ leakage/ contract/
 generator/       the simulated estate: 3 tenants, ~5,000 accounts, ~350k events, five sources, 12 data pathologies
 frontend/        React 19 + Vite + TypeScript (sign-in, queue, account, drafts, run log, low confidence, operator Admin)
 frontend/e2e/    Playwright tests that drive the real UI in real Chrome (`npm run e2e`)
-infra/scripts/   pg_bootstrap.sh, run_all.sh, e2e.sh   ·   infra/docker/ + docker-compose.yml (UNVERIFIED)
+infra/scripts/   pg_bootstrap.sh, run_all.sh, e2e.sh   ·   infra/docker/ + docker-compose.yml (built and run on arm64/Colima)
 docs/            SOLUTION_BRIEF, DECK (+ Pulse_deck.pptx), LOOM_SCRIPT, VERIFICATION (what was checked, how, and what was not)
 specs/001-…/     the delivered system: spec, plan, data model, contracts (incl. openapi.yaml), tasks, clarifications (B-1…B-29)
 specs/002-…/     production readiness: sign-in, real email, model drafting, containers — spec, plan, research, data model, tasks
@@ -91,7 +98,7 @@ about 105 s against a 15-minute interval), SC-008–SC-014. **Not met — SC-005
   fake SMTP server; scripted model replies). The real SMTP path and the 15-line Anthropic adapter have never run against a real provider. **To verify real email in one minute:** set `PULSE_SMTP_HOST`,
   `PULSE_SMTP_PORT`, `PULSE_SMTP_USER`, `PULSE_SMTP_PASSWORD` for a provider you have an account with, then `python3 -m pulse.cli send-test --to <your own address> --sender <an address the provider lets you send from>` —
   it sends one labelled test message, touches no customer or database, and reports delivered / refused / unconfirmed.
-- **The containers have never been built or run** (Docker is not installed here).
+- **The containers were run on one machine only** (arm64, Colima) — see *Containers* for what that did and did not cover; no amd64 build.
 - The browser tests cover the main paths and the key refusals in **Chrome only** — no other browser, no mobile layout, no accessibility audit.
 - The shared login limiter is tested with two limiter objects, not two real processes. Nothing has been load-tested; the 10× claim below is arithmetic from one measurement.
 
@@ -120,7 +127,7 @@ about 105 s against a 15-minute interval), SC-008–SC-014. **Not met — SC-005
   for and greeted by their external reference ("Hi northwind-01261") — the send gate blocks them (no contact) but a CSM still sees such drafts, about 11% of the list.
 - **Operations:** a whole-tenant cycle is one transaction (one bad account fails the tenant's cycle); a persistently failing tenant is retried every 30 s with no backoff; login attempts and
   the audit trail are not exported or paginated beyond the last 200 events.
-- **Containers:** written and statically checked, never built (see *Containers*).
+- **Containers:** verified on arm64 only; no amd64 build, no scan, no timing of the clean-machine path (see *Containers*).
 - **Presentation:** the deck is an `.pptx` built from `docs/DECK.md`; the Loom walkthrough is a **script** (`docs/LOOM_SCRIPT.md`) and has **not been recorded**; there is no hosted URL — the system runs locally.
 
 ## What breaks first at 10×

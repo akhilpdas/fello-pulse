@@ -560,7 +560,7 @@ demo database has not been rebuilt, so it does not yet contain customer contacts
 
 ---
 
-## Containers (spec 002 Phase 5) — UNVERIFIED
+## Containers (spec 002 Phase 5) — superseded: now VERIFIED on arm64 (see the end of this file)
 
 `docker-compose.yml`, `infra/docker/{backend,frontend}.Dockerfile`, `entrypoint.sh`, `nginx.conf`, `.dockerignore` are written and
 statically checked (`tests/unit/test_container_files.py`). **They have never been built or run: Docker is not installed on this
@@ -599,3 +599,19 @@ it overclaimed; deck rebuilt with the signed-in queue; browser suite stable (3 r
 **What is still not done or not verified** is listed in `README.md` ("What was verified", "Gaps"): no real email or LLM provider call has ever been made; containers never built (no Docker here); no SSO/MFA; bounces and replies unprocessed;
 lead time and SC-005/006 (model quality) unmet; Loom is a script not a recording; no hosted URL; account names are not unique and drafts for CRM-less accounts greet by reference.
 **Unpushed:** seven commits ahead of `origin/main` — pushing is the owner's call.
+
+
+---
+
+## Containers verified (2026-10-17) — supersedes every earlier "unverified" note above
+
+Installed Colima + the Docker CLI with Homebrew (no admin password, no GUI) and ran the stack for real. **Findings and results:**
+- images built first time (api/worker 882 MB, web 92 MB), non-root, no secrets or data baked in; all four services healthy; migrations applied by the api;
+- **one real bug, found only by running it:** the worker exited when no model existed (always the case on a fresh stack), so the runtime restarted it forever. Fixed test-first —
+  `worker.serve` now re-resolves its runtimes each tick and waits; the simulated clock tolerates an empty database (`LazyOffsetClock`);
+- `bootstrap-demo` in the container reproduced the host's numbers exactly (ROC-AUC 0.690, precision@100 0.289, 347,740 events);
+- the worker started scoring on its own as soon as the model existed, with the lease system preventing double-processing; right after `bootstrap-demo` the queue can briefly look empty
+  while it finishes (the command now says so);
+- the 9 browser scenarios pass against the containers (`infra/scripts/e2e_docker.sh`); data persists across `down`/`up`.
+**Not covered:** amd64, vulnerability scanning, the SC-012 ten-minute timing, a real SMTP provider or model key inside the stack.
+Colima is still installed and may be running (`colima status`; `colima stop` to free its 8 GB / 4 CPUs; `docker compose down -v` also deletes the stack's data volumes).

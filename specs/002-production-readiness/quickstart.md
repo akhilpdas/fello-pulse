@@ -25,9 +25,9 @@ python3 -m pulse.openapi_export         # contract drift test fails until regene
 4. **LLM (US3).** `pip install -e ".[llm]"`, then `PULSE_LLM_ENABLED=true PULSE_LLM_API_KEY=… python3 -m pulse.cli cycle` → drafts show `draft_source: llm` and a model name.
    Unset the key → template drafts; the queue order is byte-identical. (A live call is a manual check; tests
    use a scripted stand-in.)
-5. **Packaging (US4) — UNVERIFIED on this machine.** `docker compose up --build` then
-   `docker compose run --rm api python3 -m pulse.cli bootstrap-demo`. Record the result in `HANDOFF.md` the
-   first time it is run on a machine with Docker; until then every document says "unverified".
+5. **Packaging (US4) — built and run on arm64/Colima (see README).** `docker compose up --build` then
+   `docker compose run --rm api python3 -m pulse.cli bootstrap-demo`. Then `PULSE_E2E_PASSWORD=<printed> bash infra/scripts/e2e_docker.sh`
+   runs the browser suite against it. Not yet done on amd64.
 
 ## What "done" means here
 

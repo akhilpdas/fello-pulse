@@ -25,7 +25,7 @@ Point-in-time · model ranks/LLM writes (only from derived facts; output rejecte
 Precision@100 0.29 vs 0.02 baseline (~12×; range 0.22–0.33 by row order); AUC 0.69; promotion is gated on beating the baseline at the operating point.
 
 ## 9. What we are honest about
-Two planted lost-renewal accounts not flagged → lead time not claimed (B-15). A new small tenant gets almost nothing from the shared model (cold-start AUC 0.53). No real email sent and no real model call made — built and tested against stand-ins; containers never built (no Docker here).
+Two planted lost-renewal accounts not flagged → lead time not claimed (B-15). A new small tenant gets almost nothing from the shared model (cold-start AUC 0.53). No real email sent and no real model call made — built and tested against stand-ins; containers built and run on arm64 only (browser suite passes against them).
 
 ## 10. 10× and what's next
 Cycle is first to break (batched loading, more workers). Next: response-time feature work with held-out validation, uplift once intervention history exists.

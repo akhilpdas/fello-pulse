@@ -56,3 +56,13 @@ def test_a_given_password_is_used_as_is_and_not_echoed(monkeypatch, capsys):
     cli.cmd_bootstrap_demo(_args(demo_password="my own chosen passphrase"))
     assert dict(calls)["bootstrap"] == "my own chosen passphrase"
     assert "my own chosen passphrase" not in capsys.readouterr().out
+
+
+def test_it_warns_that_the_worker_may_still_be_scoring_so_an_empty_queue_is_not_a_surprise(monkeypatch, capsys):
+    """Found running the container stack: the worker starts cycling as soon as the model exists, so right after this command
+    returns the queue can still be filling in (a queue read in that window was empty)."""
+    calls = []
+    _wire(monkeypatch, calls, feeds_exist=True)
+    cli.cmd_bootstrap_demo(_args(demo_password="a long demo passphrase"))
+    out = capsys.readouterr().out.lower()
+    assert "queue" in out and "scoring" in out and "minute" in out

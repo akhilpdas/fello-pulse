@@ -310,7 +310,7 @@ a machine, the packaging is described as unverified.**
   populate it with the demo estate, matching the non-container path for the same seed.
 - **FR-033**: Images MUST contain no secrets or generated data; configuration MUST come from the
   environment; data MUST persist across restarts of the stack.
-- **FR-034**: The documentation MUST state that the container path is **unverified** until it has been
+- **FR-034** *(satisfied 2026-10-17: verified on arm64/Colima; README says exactly what was and was not covered)*: The documentation MUST state that the container path is **unverified** until it has been
   run on a machine with a container runtime, and the verification MUST be recorded when it is.
 - **FR-035**: The existing non-container path (`run_all.sh`, VS Code tasks) MUST keep working
   unchanged.

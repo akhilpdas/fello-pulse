@@ -32,7 +32,7 @@ ROC-AUC **0.69**; a full cycle over ~4,500 accounts in ~105 s against a 15-minut
 **What is not done.** The two planted "lost renewal" accounts are *not* flagged by the model, so we
 cannot yet claim lead time; the shortfall is diagnosed (response-time vs ticket-volume attribution) and
 documented, not hidden. Email delivery and language-model drafting are built and tested against stand-ins, but **no real
-email has been sent and no real model call made**; the containers have never been built (no Docker here); no SSO/MFA;
+email has been sent and no real model call made**; the containers were built and run on one machine only (arm64, Colima); no SSO/MFA;
 no uplift modelling; the Loom is a script, not a recording.
 
 **First thing to break at 10×.** The cycle (per-account event loading, ~19 min at 50k vs a 15-min

@@ -167,18 +167,28 @@ def tick(
 
 
 def serve(
-    runtimes: list[TenantRuntime], *, clock: Clock | None = None,
-    sleep: Callable[[float], None] = time.sleep, max_ticks: int | None = None,
+    runtimes: list[TenantRuntime] | Callable[[], list[TenantRuntime]], *, clock: Clock | None = None,
+    sleep: Callable[[float], None] | None = None, max_ticks: int | None = None,
 ) -> None:
     """The unattended loop: tick, sleep, repeat. No decision logic of its own -- which tenants
     are due, and whether a cycle may start, is ``tick``'s and the lease's business.
+
+    ``runtimes`` may be a callable, resolved **every tick**: on a fresh deployment the model and the tenants do not exist
+    until someone has bootstrapped, and a worker that dies on "no model yet" is restarted by the container runtime
+    forever. A ``LookupError`` from the callable means "not ready" -- the worker waits and looks again.
     ``max_ticks`` and ``sleep`` exist so the loop can be run under test."""
     clock = clock or SystemClock()
+    sleep = sleep or time.sleep
     settings = get_settings()
     ticks = 0
     while max_ticks is None or ticks < max_ticks:
+        try:
+            current = runtimes() if callable(runtimes) else runtimes
+        except LookupError as exc:
+            log.warning("worker waiting: %s", exc)
+            current = []
         tick(
-            runtimes, clock=clock, worker_id=settings.worker_id,
+            current, clock=clock, worker_id=settings.worker_id,
             lease_seconds=settings.lease_seconds,
             cycle_interval_minutes=settings.cycle_interval_minutes,
         )

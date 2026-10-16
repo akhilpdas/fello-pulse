@@ -150,3 +150,11 @@ and it assumed the first few drafts had a contact (≈1 in 9 do not, and they cl
 
 **`pulse send-test`** (added 2026-10-17): one command that sends a labelled test message through the configured SMTP provider and reports delivered / permanent / transient / unconfirmed. Tested against the fake server only (4 tests); it exists so the one
 unverified step — a real message to a real inbox — is a one-minute job for whoever holds credentials. **It has not been run against a real provider.**
+
+## 2026-10-17 — the container stack, actually run
+
+Installed Colima + Docker CLI (Homebrew; arm64). Built and ran `docker compose`. Observed, not assumed:
+**builds** (api/worker 882 MB, web 92 MB) · **healthy** db → api (migrations) → worker, web · **non-root** (uid 10001; nginx 101) · **no data, models or credential files** in the image (`/app/data`, `/app/artifacts` empty;
+no credential-named env var baked in) · **bug found by running it:** the worker crash-looped with no model → fixed (`test_worker_waits_for_a_model`) · `bootstrap-demo` in the container → 347,740 events, ROC-AUC 0.690,
+precision@100 0.289, **identical to the host** · queue through nginx: 12 rows, 2,490 below the cut (same top account as the host) · **9/9 browser scenarios pass against the containers** · `down` then `up`: sign-in and queue intact.
+One transient: the queue read empty right after `bootstrap-demo` because the worker (started cycling as soon as a model existed) was still scoring northwind; leases kept the two cyclers from double-processing a tenant. Not verified: amd64, scans, timing.

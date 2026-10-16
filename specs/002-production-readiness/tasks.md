@@ -169,6 +169,9 @@ is labelled so, never presented as test-first. Run the **full** suite (`python3 
 - [x] T304 [US1] RED+GREEN `pulse.auth.limiter.PgLoginLimiter` + migration `0006` + `tests/integration/test_pg_login_limiter.py` — login rate limiting shared across API instances; only a hash is stored. Closes the per-process limit stated in R-4. (FR-007)
 - [x] T305 RED+GREEN `pulse.ml.pipeline.panel_account_ids` + `tests/integration/test_panel_order_is_deterministic.py` — the panel was built in physical-layout order, so the same data gave precision@100 0.196–0.326 across rebuilds. Now ordered by external ref. (B-27; constitution: determinism)
 
+- [x] T306 [US4] RED+GREEN `worker.serve` re-resolves its runtimes each tick and waits for a model; `LazyOffsetClock`; `tests/unit/test_worker_waits_for_a_model.py` — found by actually running the compose stack (the worker crash-looped with no model). (FR-031)
+- [x] T307 [US4] Container stack built and run on arm64/Colima: images build, all services healthy, `bootstrap-demo` reproduces the host's metrics exactly, 9 browser scenarios pass against it (`infra/scripts/e2e_docker.sh`), non-root, no baked-in secrets, data persists across restart. Supersedes T294's "unverified" label. (FR-031–FR-034, SC-012 partly — timing not measured, amd64 not built)
+
 ## Dependencies and order
 
 ```text
@@ -193,5 +196,5 @@ Phase 0 (gaps)  ─┐
 
 ## Counts
 
-Total **108 tasks**, **108 done**. Guards (pass on first run, not test-first): T231, T253, T268\*, T284\*, T285, T295 and the reconcile/empty-key guards added later.
+Total **110 tasks**, **110 done**. Guards (pass on first run, not test-first): T231, T253, T268\*, T284\*, T285, T295 and the reconcile/empty-key guards added later.
 Of these, tasks labelled GUARD (expected to pass immediately, not test-first): T231, T253, T268\*, T284\*, T285, T295 (\* if it passes first time).

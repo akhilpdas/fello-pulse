@@ -10,6 +10,7 @@ component takes a ``Clock``; production passes ``SystemClock``, tests pass
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
@@ -40,6 +41,23 @@ class OffsetClock:
 
     def now(self) -> datetime:
         return self.base.now() + self.offset
+
+
+class LazyOffsetClock:
+    """The real clock until the data's present is known, then ``base`` shifted so that *now* is that present, fixed from then on.
+
+    The demo data is dated later than the wall clock, and on a fresh stack there is no data when the worker starts --
+    so the offset cannot be computed up front. ``find_newest`` returns the newest event time, or ``None`` if none yet."""
+
+    def __init__(self, base: Clock, find_newest: Callable[[], datetime | None]) -> None:
+        self._base, self._find, self._offset = base, find_newest, None
+
+    def now(self) -> datetime:
+        if self._offset is None:
+            newest = self._find()
+            if newest is not None:
+                self._offset = newest - self._base.now()
+        return self._base.now() + (self._offset or timedelta(0))
 
 
 @dataclass
