@@ -242,3 +242,12 @@ def two_tenants():
 @pytest.fixture
 def scoped_tables() -> list[str]:
     return sorted(TENANT_SCOPED_TABLES)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_login_attempts():
+    """The login limiter's state lives in the database and is shared by every test that signs in from the same test
+    client address; start each test with none, so one test's failed logins can never lock out another's."""
+    with owner_session() as s:
+        s.execute(text("DELETE FROM login_attempt"))
+    yield

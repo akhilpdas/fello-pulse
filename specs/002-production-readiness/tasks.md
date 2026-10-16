@@ -114,7 +114,7 @@ is labelled so, never presented as test-first. Run the **full** suite (`python3 
 - [x] T267 [US2] GREEN `contact_opt_out` handling + footer in `agent/transport.py` message builder. (FR-016, R-11)
 - [x] T268 [US2] RED `backend/tests/integration/test_autonomy_boundary_real_transport.py` — with `SmtpTransport`: an un-allowlisted play cannot self-send; suppression window, per-cycle rate limit and mid-cycle revocation still hold; every declined decision is recorded. (Principle III, FR-019). May pass immediately → label GUARD if so, and say so in the commit.
 - [x] T269 [US2] RED `backend/tests/unit/test_transport_selection.py` — `select_transport(settings, tenant_cfg)` returns `SmtpTransport` only when SMTP is configured **and** the tenant has outbound enabled and a verified sender; otherwise `RecordingTransport`; with nothing configured the system still runs. Fails: function missing. (FR-014, FR-022)
-- [ ] T269a [US2] GREEN `api/deps.py::get_transport` and `agent/worker.build_runtime` use `select_transport`. (FR-022)
+- [x] T269a [US2] GREEN `api/deps.py::get_transport` and `agent/worker.build_runtime` use `select_transport`. (FR-022)
 
 - [x] T270 [P] [US2] RED `backend/tests/integration/test_no_secrets_leak.py` — set recognisable SMTP/LLM secrets; assert they appear in no API response, `agent_run` row, log line or exception message. Fails if any path echoes them. (FR-021)
 - [x] T271 [P] [US2] RED `frontend/src/__tests__/drafts_states.test.ts` — Drafts shows `redirected_to`, `send_unconfirmed` (with "check the provider before re-sending") and each blocked state in plain words. (FR-013, FR-018)
@@ -193,5 +193,5 @@ Phase 0 (gaps)  ─┐
 
 ## Counts
 
-Total **104 tasks** (T201–T301 plus T215a, T269a). Phase 0: 11 · Phase 1: 5 · US1: 33 · US2: 26 · US3: 15 · US4: 7 · Phase 6: 6.
+Total **108 tasks** (T201–T305, plus T215a and T269a).
 Of these, tasks labelled GUARD (expected to pass immediately, not test-first): T231, T253, T268\*, T284\*, T285, T295 (\* if it passes first time).

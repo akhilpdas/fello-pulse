@@ -100,6 +100,7 @@ class Settings(BaseSettings):
     session_hours: int = 12
     cookie_secure: bool = False  # set true behind https
     login_max_failures: int = 5
+    login_max_failures_per_address: int = 50  # across *all* accounts: stops password spraying
     login_window_seconds: int = 300
 
     # Outbound mail (002 / FR-013, FR-021). Credentials are deployment-level, never in the database.

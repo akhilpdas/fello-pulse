@@ -62,9 +62,14 @@ class PgLoginLimiter:
     per-process limit stated in research R-4). Only a hash of the key is stored; failures older than the window are
     deleted as the key is touched, and ``purge`` sweeps the rest."""
 
-    def __init__(self, max_failures: int, window_seconds: int) -> None:
+    def __init__(self, max_failures: int, window_seconds: int, max_per_source: int | None = None) -> None:
         self._max = max_failures
+        self._max_per_source = max_per_source if max_per_source is not None else max_failures
         self._window = timedelta(seconds=window_seconds)
+
+    def _limit_for(self, key: Key) -> int:
+        """A key whose workspace and email are ``*`` counts a whole source address, across every account."""
+        return self._max_per_source if key[1] == "*" and key[2] == "*" else self._max
 
     @staticmethod
     def _hash(key: Key) -> str:
@@ -76,7 +81,7 @@ class PgLoginLimiter:
                 text("SELECT count(*) FROM login_attempt WHERE key_hash = :h AND at > :since"),
                 {"h": self._hash(key), "since": now - self._window},
             ).scalar()
-        return n < self._max
+        return n < self._limit_for(key)
 
     def record_failure(self, key: Key, *, now: datetime) -> None:
         h = self._hash(key)

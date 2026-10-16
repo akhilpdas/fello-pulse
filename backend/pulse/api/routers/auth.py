@@ -32,7 +32,8 @@ def get_limiter() -> LoginLimiter | PgLoginLimiter:
     global _limiter
     if _limiter is None:
         s = get_settings()
-        _limiter = PgLoginLimiter(s.login_max_failures, s.login_window_seconds)  # shared across API instances
+        _limiter = PgLoginLimiter(s.login_max_failures, s.login_window_seconds,
+                                  max_per_source=s.login_max_failures_per_address)  # shared across API instances
     return _limiter
 
 
@@ -49,8 +50,12 @@ def login(
     clock: Clock = Depends(get_clock), limiter: LoginLimiter | PgLoginLimiter = Depends(get_limiter),
 ):
     now = clock.now()
-    key = (request.client.host if request.client else "unknown", req.workspace.strip().lower(), req.email.strip().lower())
-    if not limiter.allowed(key, now=now):
+    address = request.client.host if request.client else "unknown"
+    key = (address, req.workspace.strip().lower(), req.email.strip().lower())
+    # Two limits (FR-007): per identity, and per *source* across every account -- one password tried against
+    # many accounts never fails any single account twice, so only an address-wide count stops that.
+    source_key = (address, "*", "*")
+    if not (limiter.allowed(key, now=now) and limiter.allowed(source_key, now=now)):
         raise HTTPException(status_code=429, detail="too many attempts; try again later")
 
     with public_session() as s:
@@ -68,6 +73,7 @@ def login(
     ok = verify_password(req.password, user.password_hash if usable else None)
     if not (ok and usable):
         limiter.record_failure(key, now=now)
+        limiter.record_failure(source_key, now=now)
         if tenant is not None:  # an unknown workspace has no tenant trail to write to
             audit.record_separately(tenant.id, "login_failed", actor_kind="anonymous",
                                     subject=req.email.strip())
