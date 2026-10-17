@@ -125,9 +125,7 @@ def cmd_cycle(args) -> int:
     model, version = load_promoted_model(Path(args.artifacts))
     with elevated_session() as s:
         tenants = trainable_tenants(s)
-    with owner_session() as s:
-        as_of = (datetime.fromisoformat(args.as_of) if args.as_of
-                 else s.execute(text("SELECT max(received_at) FROM source_event")).scalar())
+    as_of = datetime.fromisoformat(args.as_of) if args.as_of else _data_present()
     runtimes = [build_runtime(tid, model=model, model_version=version, transport=select_transport(get_settings()))
                 for tid, _ in tenants]
     settings = get_settings()
@@ -139,6 +137,45 @@ def cmd_cycle(args) -> int:
     for r in results:
         print(f"  run {r.run_id}: {r.stage_counts} declined={len(r.decisions_declined)}")
     return 0
+
+
+def cmd_backfill(args) -> int:
+    """Weekly score history before each tenant's newest snapshot, so the queue has something to browse and compare.
+    Scores only -- no drafts, no sends, no run records (see scoring/backfill.py for the in-sample caveat)."""
+    from pulse.agent.transport import select_transport
+    from pulse.agent.worker import build_runtime
+    from pulse.config import get_settings
+    from pulse.db.session import elevated_session
+    from pulse.ml.pipeline import trainable_tenants
+    from pulse.scoring.backfill import backfill_snapshots
+
+    model, version = _load_promoted(args.artifacts)
+    with elevated_session() as s:
+        tenants = trainable_tenants(s)
+    for tenant_id, slug in tenants:
+        with owner_session() as s:
+            anchor = s.execute(text("SELECT max(as_of) FROM score WHERE tenant_id = :t"), {"t": tenant_id}).scalar()
+        if anchor is None:
+            print(f"  {slug:10s} no snapshot to anchor on -- run a cycle first")
+            continue
+        rt = build_runtime(tenant_id, model=model, model_version=version, transport=select_transport(get_settings()))
+        with tenant_session(tenant_id) as s:
+            done = backfill_snapshots(s, tenant_id=tenant_id, model=model, model_version=version,
+                                      tenant_config=rt.tenant_config, anchor=anchor, weeks=args.weeks)
+        print(f"  {slug:10s} {len(done)} weekly snapshots before {anchor.date()}, {sum(done.values())} scores")
+    return 0
+
+
+def _data_present():
+    """The simulated "now": the newest moment every source of the ingested tenants has reported (B-30)."""
+    from pulse.db.session import elevated_session
+    from pulse.ingest.present import data_present
+    from pulse.ml.pipeline import trainable_tenants
+
+    with elevated_session() as s:
+        tenant_ids = [tid for tid, _ in trainable_tenants(s)]
+    with owner_session() as s:
+        return data_present(s, tenant_ids)
 
 
 def _load_promoted(artifacts: str):
@@ -169,11 +206,7 @@ def cmd_serve(args) -> int:
         transport = select_transport(get_settings())
         return [build_runtime(tid, model=model, model_version=version, transport=transport) for tid, _ in tenants]
 
-    def newest_event():
-        with owner_session() as s:
-            return s.execute(text("SELECT max(received_at) FROM source_event")).scalar()
-
-    clock = LazyOffsetClock(SystemClock(), newest_event) if args.simulate_present else SystemClock()
+    clock = LazyOffsetClock(SystemClock(), _data_present) if args.simulate_present else SystemClock()
     settings = get_settings()
     try:
         ready = resolve()
@@ -284,6 +317,9 @@ def main() -> int:
     st = sub.add_parser("status"); st.set_defaults(fn=cmd_status)
     c = sub.add_parser("cycle"); c.add_argument("--as-of", default=None)
     c.add_argument("--artifacts", default="../artifacts"); c.set_defaults(fn=cmd_cycle)
+    bf = sub.add_parser("backfill", help="score weekly history before each tenant's newest snapshot (scores only)")
+    bf.add_argument("--weeks", type=int, default=8); bf.add_argument("--artifacts", default="../artifacts")
+    bf.set_defaults(fn=cmd_backfill)
     bd = sub.add_parser("bootstrap-demo"); bd.add_argument("--feeds", default="../data/feeds")
     bd.add_argument("--seed", type=int, default=20261015); bd.add_argument("--artifacts", default="../artifacts")
     bd.add_argument("--demo-password", default=None); bd.set_defaults(fn=cmd_bootstrap_demo)

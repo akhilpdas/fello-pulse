@@ -46,6 +46,43 @@ _QUEUE_SQL = """
 
 
 
+def _latest_as_of(session: Session) -> datetime | None:
+    return session.execute(text("SELECT max(as_of) FROM score")).scalar()
+
+
+def _ranked(session: Session, principal: Principal, as_of: datetime) -> tuple[list, int]:
+    """Every visible, non-suppressed, scored account at ``as_of`` in priority order, plus the weekly capacity."""
+    tenant_row_id = session.execute(text("SELECT current_setting('pulse.tenant_id')::uuid")).scalar()
+    capacity = session.execute(
+        text("SELECT weekly_capacity FROM tenant_config WHERE tenant_id = :t"), {"t": tenant_row_id}
+    ).scalar() or 10
+    visible, vparams = visible_clause(principal)
+    rows = session.execute(
+        text(_QUEUE_SQL.format(visible=visible)), {"tenant_id": tenant_row_id, "as_of": as_of, **vparams}
+    ).mappings().all()
+    return list(rows), capacity
+
+
+def _row(r) -> dict:
+    delta = None
+    if r["prev_probability"] is not None:
+        delta = float(r["probability"]) - float(r["prev_probability"])
+    return {
+        "account_id": str(r["account_id"]),
+        "account_name": r["account_name"],
+        "tier": r["tier"],
+        "health_score": r["health_score"],
+        "probability": float(r["probability"]),
+        "value_at_risk_cents": r["value_at_risk_cents"],
+        "dominant_driver": r["dominant_driver"],
+        "days_to_renewal": r["days_to_renewal"],
+        "priority": float(r["priority"]),
+        "confidence": r["confidence"],
+        "abstain_reason": r["abstain_reason"],
+        "delta": delta,
+    }
+
+
 @router.get("/queue")
 def get_queue(
     as_of: datetime | None = Query(default=None),
@@ -53,42 +90,62 @@ def get_queue(
     principal: Principal = Depends(get_principal),
 ):
     if as_of is None:
-        as_of = session.execute(text("SELECT max(as_of) FROM score")).scalar()
+        as_of = _latest_as_of(session)
         if as_of is None:
             return {"as_of": None, "rows": [], "below_cut": 0}
 
-    tenant_row_id = session.execute(text("SELECT current_setting('pulse.tenant_id')::uuid")).scalar()
-    capacity = session.execute(
-        text("SELECT weekly_capacity FROM tenant_config WHERE tenant_id = :t"), {"t": tenant_row_id}
-    ).scalar() or 10
-
-    visible, vparams = visible_clause(principal)
-    rows = session.execute(
-        text(_QUEUE_SQL.format(visible=visible)), {"tenant_id": tenant_row_id, "as_of": as_of, **vparams}
-    ).mappings().all()
-
-    out_rows = []
-    for r in rows[:capacity]:
-        delta = None
-        if r["prev_probability"] is not None:
-            delta = float(r["probability"]) - float(r["prev_probability"])
-        out_rows.append({
-            "account_id": str(r["account_id"]),
-            "account_name": r["account_name"],
-            "tier": r["tier"],
-            "health_score": r["health_score"],
-            "probability": float(r["probability"]),
-            "value_at_risk_cents": r["value_at_risk_cents"],
-            "dominant_driver": r["dominant_driver"],
-            "days_to_renewal": r["days_to_renewal"],
-            "priority": float(r["priority"]),
-            "confidence": r["confidence"],
-            "abstain_reason": r["abstain_reason"],
-            "delta": delta,
-        })
-
+    rows, capacity = _ranked(session, principal, as_of)
+    out_rows = [_row(r) for r in rows[:capacity]]
     below_cut = max(0, len(rows) - capacity)
     return {"as_of": as_of.isoformat(), "rows": out_rows, "below_cut": below_cut}
+
+
+@router.get("/queue/snapshots")
+def get_queue_snapshots(
+    session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
+):
+    """The dates a queue exists for, newest first, with how many of the caller's accounts were scored on each."""
+    visible, vparams = visible_clause(principal)
+    rows = session.execute(
+        text("SELECT s.as_of, count(*) AS scored FROM score s JOIN account a ON a.id = s.account_id"
+             f" WHERE {visible} GROUP BY s.as_of ORDER BY s.as_of DESC"),
+        vparams,
+    ).all()
+    return {"snapshots": [{"as_of": r[0].isoformat(), "scored": r[1]} for r in rows]}
+
+
+@router.get("/queue/all")
+def get_queue_all(
+    as_of: datetime | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=500),
+    tier: str | None = Query(default=None),
+    driver: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    session: Session = Depends(get_session),
+    principal: Principal = Depends(get_principal),
+):
+    """The same ranking as ``/queue`` without the capacity cut: paginated and filterable. ``rank`` is the account's
+    position in the full ranking (so it is stable under filtering and paging); ``in_queue`` says whether it is inside
+    this week's capacity."""
+    if as_of is None:
+        as_of = _latest_as_of(session)
+        if as_of is None:
+            return {"as_of": None, "rows": [], "total": 0, "offset": offset, "limit": limit, "capacity": 0}
+
+    rows, capacity = _ranked(session, principal, as_of)
+    ranked = [(rank, r) for rank, r in enumerate(rows, start=1)]
+    if tier:
+        ranked = [(k, r) for k, r in ranked if r["tier"] == tier]
+    if driver:
+        ranked = [(k, r) for k, r in ranked if r["dominant_driver"] == driver]
+    if q:
+        needle = q.strip().lower()
+        ranked = [(k, r) for k, r in ranked if needle in (r["account_name"] or "").lower()]
+    page = [{**_row(r), "rank": k, "in_queue": k <= capacity} for k, r in ranked[offset:offset + limit]]
+    return {"as_of": as_of.isoformat(), "rows": page, "total": len(ranked), "offset": offset, "limit": limit,
+            "capacity": capacity}
 
 
 @router.get("/queue/low-confidence")

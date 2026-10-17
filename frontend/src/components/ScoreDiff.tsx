@@ -1,19 +1,24 @@
 import { useState } from "react";
 import { useSession } from "../lib/session";
-import type { ScoreDiff as Diff } from "../api/types";
+import type { ScoreDiff as Diff, Snapshots } from "../api/types";
+import { snapshotLabel } from "../lib/browse";
 import { formatDelta, formatPercent } from "../lib/format";
+import { useApi } from "../lib/useApi";
 
 export function ScoreDiffView({ accountId, currentAsOf }: { accountId: string; currentAsOf: string }) {
   const { api } = useSession();
   const [from, setFrom] = useState("");
   const [diff, setDiff] = useState<Diff | null>(null);
+  // Only weeks that exist can be compared, and the server matches the stored timestamp exactly -- so offer those, untouched.
+  const { data: weeks } = useApi((a) => a.get<Snapshots>("/queue/snapshots"));
+  const earlier = (weeks?.snapshots ?? []).filter((w) => new Date(w.as_of).getTime() !== new Date(currentAsOf).getTime());
   const [error, setError] = useState<string | null>(null);
 
   async function compare() {
     setError(null); setDiff(null);
     try {
       setDiff(await api.get<Diff>(`/accounts/${accountId}/score-diff`, {
-        from_as_of: new Date(from).toISOString(), to_as_of: currentAsOf,
+        from_as_of: from, to_as_of: currentAsOf,
       }));
     } catch (e) { setError((e as Error).message); }
   }
@@ -21,7 +26,10 @@ export function ScoreDiffView({ accountId, currentAsOf }: { accountId: string; c
   return (
     <div>
       <label>Compare against the score as of{" "}
-        <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <select value={from} onChange={(e) => setFrom(e.target.value)}>
+          <option value="">{earlier.length ? "Choose a week…" : "No earlier weeks scored yet"}</option>
+          {earlier.map((w) => <option key={w.as_of} value={w.as_of}>{snapshotLabel(w, false)}</option>)}
+        </select>
       </label>{" "}
       <button onClick={compare} disabled={!from}>Compare</button>
       {error && <p className="error" role="alert">{error}</p>}

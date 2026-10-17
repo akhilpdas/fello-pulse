@@ -71,6 +71,92 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /queue/snapshots:
+    get:
+      summary: Get Queue Snapshots
+      description: The dates a queue exists for, newest first, with how many of the
+        caller's accounts were scored on each.
+      operationId: get_queue_snapshots_queue_snapshots_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /queue/all:
+    get:
+      summary: Get Queue All
+      description: 'The same ranking as ``/queue`` without the capacity cut: paginated
+        and filterable. ``rank`` is the account''s
+
+        position in the full ranking (so it is stable under filtering and paging);
+        ``in_queue`` says whether it is inside
+
+        this week''s capacity.'
+      operationId: get_queue_all_queue_all_get
+      parameters:
+      - name: as_of
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: As Of
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: tier
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tier
+      - name: driver
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Driver
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Q
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /queue/low-confidence:
     get:
       summary: Get Low Confidence

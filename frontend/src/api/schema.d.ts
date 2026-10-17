@@ -72,6 +72,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/queue/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue Snapshots
+         * @description The dates a queue exists for, newest first, with how many of the caller's accounts were scored on each.
+         */
+        get: operations["get_queue_snapshots_queue_snapshots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/queue/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue All
+         * @description The same ranking as ``/queue`` without the capacity cut: paginated and filterable. ``rank`` is the account's
+         *     position in the full ranking (so it is stable under filtering and paging); ``in_queue`` says whether it is inside
+         *     this week's capacity.
+         */
+        get: operations["get_queue_all_queue_all_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/queue/low-confidence": {
         parameters: {
             query?: never;
@@ -179,7 +221,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Approve Action */
+        /**
+         * Approve Action
+         * @description Approve a draft and deliver it -- once. The claim below is a single conditional UPDATE, so of two
+         *     simultaneous approvals exactly one wins and sends; the other returns the winner's result. States in
+         *     which the message may already have left (sent, send_unconfirmed) are never claimed again.
+         */
         post: operations["approve_action_actions__action_id__approve_post"];
         delete?: never;
         options?: never;
@@ -290,6 +337,59 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/outbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Outbound */
+        get: operations["get_outbound_admin_outbound_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Outbound */
+        patch: operations["patch_outbound_admin_outbound_patch"];
+        trace?: never;
+    };
+    "/admin/opt-outs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Opt Outs */
+        get: operations["list_opt_outs_admin_opt_outs_get"];
+        put?: never;
+        /** Add Opt Out */
+        post: operations["add_opt_out_admin_opt_outs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/opt-outs/{opt_out_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Opt Out */
+        delete: operations["remove_opt_out_admin_opt_outs__opt_out_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -501,6 +601,26 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** OptOutCreate */
+        OptOutCreate: {
+            /** Email */
+            email: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** OutboundPatch */
+        OutboundPatch: {
+            /** Outbound Enabled */
+            outbound_enabled?: boolean | null;
+            /** Sender Address */
+            sender_address?: string | null;
+            /** Sender Verified */
+            sender_verified?: boolean | null;
+            /** Demo Mode */
+            demo_mode?: boolean | null;
+            /** Test Inbox */
+            test_inbox?: string | null;
+        };
         /** OwnerPatch */
         OwnerPatch: {
             /** Owner User Id */
@@ -645,6 +765,62 @@ export interface operations {
         parameters: {
             query?: {
                 as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_snapshots_queue_snapshots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_queue_all_queue_all_get: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+                offset?: number;
+                limit?: number;
+                tier?: string | null;
+                driver?: string | null;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -1063,6 +1239,143 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_outbound_admin_outbound_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    patch_outbound_admin_outbound_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutboundPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_opt_outs_admin_opt_outs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    add_opt_out_admin_opt_outs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptOutCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_opt_out_admin_opt_outs__opt_out_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                opt_out_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

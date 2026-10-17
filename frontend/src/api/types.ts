@@ -8,6 +8,10 @@ export interface QueueRow {
   abstain_reason: string | null; delta: number | null;
 }
 export interface Queue { as_of: string | null; rows: QueueRow[]; below_cut: number }
+export interface BrowseRow extends QueueRow { rank: number; in_queue: boolean }
+export interface BrowseResult { as_of: string | null; rows: BrowseRow[]; total: number; offset: number; limit: number; capacity: number }
+export interface Snapshot { as_of: string; scored: number }
+export interface Snapshots { snapshots: Snapshot[] }
 export interface LowConfidenceRow {
   account_id: string; account_name: string; abstain_reason: string;
   value_at_risk_cents: number | null; remedy: string;

@@ -1,15 +1,20 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Status } from "../components/Status";
 import { TierBadge } from "../components/TierBadge";
+import { WeekPicker } from "../components/WeekPicker";
 import type { Queue as QueueT } from "../api/types";
 import { driverLabel, formatDelta, formatMoney, formatPercent, renewalLabel } from "../lib/format";
 import { useApi } from "../lib/useApi";
 
 export function QueuePage() {
-  const { data, error, loading } = useApi((api) => api.get<QueueT>("/queue"));
+  const [params, setParams] = useSearchParams();
+  const asOf = params.get("as_of") ?? "";
+  const { data, error, loading } = useApi((api) => api.get<QueueT>("/queue", { as_of: asOf || undefined }), [asOf]);
+  const setWeek = (v: string) => setParams(v ? { as_of: v } : {});
   return (
     <section>
       <h1>This week's queue</h1>
+      <WeekPicker value={asOf} onChange={setWeek} />
       <Status loading={loading} error={error} empty={data && !data.rows.length && "Nothing scored yet — run a cycle."} />
       {data && data.rows.length > 0 && (
         <>
@@ -32,6 +37,9 @@ export function QueuePage() {
             </tbody>
           </table>
           <p className="muted">{data.below_cut} more account{data.below_cut === 1 ? "" : "s"} below the weekly capacity cut.</p>
+          {data.below_cut > 0 && (
+            <p><Link to={asOf ? `/browse?as_of=${encodeURIComponent(asOf)}` : "/browse"}>Browse all accounts →</Link></p>
+          )}
         </>
       )}
     </section>

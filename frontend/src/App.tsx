@@ -3,6 +3,7 @@ import { useSession } from "./lib/session";
 import { navFor } from "./lib/nav";
 import { AccountPage } from "./pages/Account";
 import { AdminPage } from "./pages/Admin";
+import { BrowsePage } from "./pages/Browse";
 import { DraftsPage } from "./pages/Drafts";
 import { LoginPage } from "./pages/Login";
 import { LowConfidencePage } from "./pages/LowConfidence";
@@ -36,6 +37,7 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<QueuePage />} />
+          <Route path="/browse" element={<BrowsePage />} />
           <Route path="/low-confidence" element={<LowConfidencePage />} />
           <Route path="/accounts/:id" element={<AccountPage />} />
           <Route path="/drafts" element={<DraftsPage />} />

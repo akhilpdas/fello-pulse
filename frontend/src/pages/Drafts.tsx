@@ -7,7 +7,7 @@ import { driverLabel } from "../lib/format";
 import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
 
-function Draft({ a, onChanged }: { a: Action; onChanged: () => void }) {
+function Draft({ a, onChanged }: { a: Action; onChanged: (what: string, result: Action) => void }) {
   const { api } = useSession();
   const [body, setBody] = useState(a.body);
   const [subject, setSubject] = useState(a.subject ?? "");
@@ -15,9 +15,9 @@ function Draft({ a, onChanged }: { a: Action; onChanged: () => void }) {
   const editable = a.state === "drafted";
   const meaning = describeState(a);
 
-  async function run(fn: () => Promise<unknown>) {
+  async function run(what: string, fn: () => Promise<Action>) {
     setErr(null);
-    try { await fn(); onChanged(); } catch (e) { setErr((e as Error).message); }
+    try { onChanged(what, await fn()); } catch (e) { setErr((e as Error).message); }
   }
   return (
     <article className="draft">
@@ -39,9 +39,9 @@ function Draft({ a, onChanged }: { a: Action; onChanged: () => void }) {
       </div>
       {(editable || canApprove(a.state)) && (
         <footer>
-          {editable && <button onClick={() => run(() => api.patch(`/actions/${a.id}`, { subject, body }))}>Save edit</button>}{" "}
-          <button onClick={() => run(() => api.post(`/actions/${a.id}/approve`, {}))}>Approve & send</button>{" "}
-          {editable && <button onClick={() => run(() => api.post(`/actions/${a.id}/reject`, {}))}>Reject</button>}
+          {editable && <button onClick={() => run("Saved", () => api.patch<Action>(`/actions/${a.id}`, { subject, body }))}>Save edit</button>}{" "}
+          <button onClick={() => run("Approve & send", () => api.post<Action>(`/actions/${a.id}/approve`, {}))}>Approve & send</button>{" "}
+          {editable && <button onClick={() => run("Reject", () => api.post<Action>(`/actions/${a.id}/reject`, {}))}>Reject</button>}
         </footer>
       )}
       {err && <p className="error" role="alert">{err}</p>}
@@ -52,16 +52,25 @@ function Draft({ a, onChanged }: { a: Action; onChanged: () => void }) {
 export function DraftsPage() {
   const [state, setState] = useState("drafted");
   const { data, error, loading, reload } = useApi((api) => api.get<{ rows: Action[] }>("/actions", { state }), [state]);
+  // What just happened to the draft you acted on. Without it an approved draft simply leaves this list -- and when it was
+  // blocked (outbound off, no contact, opted out) nothing would say it had not been sent.
+  const [notice, setNotice] = useState<{ what: string; a: Action } | null>(null);
+  const noticeText = notice && describeState(notice.a);
   return (
     <section>
       <h1>Draft review</h1>
+      {notice && noticeText && (
+        <p className={`state-note draft-notice tone-${noticeText.tone}`} role="status">
+          <strong>{notice.what}:</strong> {noticeText.text} <button className="link" onClick={() => setNotice(null)}>Dismiss</button>
+        </p>
+      )}
       <label>Show{" "}
         <select value={state} onChange={(e) => setState(e.target.value)}>
           {["drafted", "sent", "send_unconfirmed", "send_failed", "outbound_disabled", "not_configured", "no_recipient", "opted_out", "rejected"].map((s) => <option key={s}>{s}</option>)}
         </select>
       </label>
       <Status loading={loading} error={error} empty={data && !data.rows.length && `No ${state} actions.`} />
-      {data?.rows.map((a) => <Draft key={a.id + a.state} a={a} onChanged={reload} />)}
+      {data?.rows.map((a) => <Draft key={a.id + a.state} a={a} onChanged={(what, result) => { setNotice({ what, a: result }); reload(); }} />)}
     </section>
   );
 }
