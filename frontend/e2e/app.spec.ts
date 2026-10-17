@@ -59,6 +59,112 @@ test("an operator signs in and sees the whole tenant's queue, and the Admin page
   expect(operatorBelowCut).toBeGreaterThan(1000); // the whole tenant is behind the cut
 });
 
+test("the accounts below the weekly cut can be reached, paged through and filtered", async ({ page }) => {
+  await signIn(page, OPERATOR);
+  await expect(page.locator("table tbody tr").first()).toBeVisible();
+  await page.getByRole("link", { name: /Browse all/ }).click();
+  await expect(page.getByRole("heading", { name: "All accounts" })).toBeVisible();
+
+  const rows = page.locator("table tbody tr");
+  await expect(rows.first()).toBeVisible();
+  expect(await rows.count()).toBe(50);
+  const summary = page.getByText(/^Showing 1–50 of [\d,]+/);
+  await expect(summary).toBeVisible();
+  const total = Number((await summary.innerText()).match(/of ([\d,]+)/)![1].replace(/,/g, ""));
+  expect(total).toBeGreaterThan(operatorBelowCut); // everything behind the cut is in here, plus the queue itself
+
+  // the first rows are this week's queue; paging goes past it, with ranks that carry on rather than restart
+  await expect(rows.first().locator("td").first()).toHaveText("1");
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByText(/^Showing 51–100 of /)).toBeVisible();
+  await expect(rows.first().locator("td").first()).toHaveText("51");
+  await expect(page.getByRole("button", { name: "Previous" })).toBeEnabled();
+  await page.getByRole("button", { name: "Previous" }).click();
+  await expect(page.getByText(/^Showing 1–50 of /)).toBeVisible();
+
+  // searching narrows the list and every row matches; a rank keeps its position in the full ranking
+  const name = (await rows.nth(7).locator("td").nth(1).innerText()).split(" ")[0];
+  await page.getByLabel("Search accounts").fill(name);
+  const shownNames = async () => (await rows.locator("td:nth-child(2)").allInnerTexts()).map((n) => n.toLowerCase());
+  await expect.poll(async () => { // the search is debounced, so wait for the narrowed list rather than reading the old one
+    const names = await shownNames();
+    return names.length > 0 && names.every((n) => n.includes(name.toLowerCase()));
+  }).toBe(true);
+
+  // filtering by tier leaves only that tier
+  await page.getByLabel("Search accounts").fill("");
+  await page.getByLabel("Tier").selectOption("red");
+  await expect.poll(async () => {
+    const tiers = (await rows.locator("td:nth-child(3)").allInnerTexts()).map((t) => t.toLowerCase());
+    return tiers.length > 0 && tiers.every((t) => t.includes("red"));
+  }).toBe(true);
+
+  // a row opens the account
+  await rows.first().getByRole("link").click();
+  await expect(page.getByRole("heading", { name: "What is driving it" })).toBeVisible();
+});
+
+test("earlier weeks can be opened, and the latest queue shows what changed since the one before", async ({ page }) => {
+  await signIn(page, OPERATOR);
+  await expect(page.locator("table tbody tr").first()).toBeVisible();
+
+  // the latest queue has history to compare against: not every row is "new"
+  const deltas = await page.locator("table tbody tr td:last-child").allInnerTexts();
+  expect(deltas.some((d) => d.trim() !== "new")).toBe(true);
+
+  const week = page.getByLabel("Week");
+  const options = await week.locator("option").allInnerTexts();
+  expect(options.length).toBeGreaterThan(1);
+  expect(options[0]).toContain("latest");
+  const latestDate = await page.getByText(/^As of /).innerText();
+
+  await week.selectOption({ index: 1 });
+  await expect(page.getByText(/^As of /)).not.toHaveText(latestDate);
+  await expect(page.locator("table tbody tr").first()).toBeVisible();
+  const chosen = await week.locator("option:checked").innerText();
+
+  // the same week is selected when browsing everything, so the two views agree
+  await page.getByRole("link", { name: /Browse all/ }).click();
+  await expect(page.getByRole("heading", { name: "All accounts" })).toBeVisible();
+  await expect(page.getByLabel("Week").locator("option:checked")).toHaveText(chosen);
+});
+
+test("\"What moved\" compares an account against an earlier week chosen from the weeks that exist", async ({ page }) => {
+  // Found by reading the code while writing the walkthrough: the comparison needs a stored timestamp exactly, and the old
+  // minute-precision date picker could not produce one, so every comparison from the UI was a 404.
+  await signIn(page, OPERATOR);
+  await expect(page.locator("table tbody tr").first()).toBeVisible();
+  await page.locator("table tbody tr").first().getByRole("link").click();
+  await expect(page.getByRole("heading", { name: "What moved" })).toBeVisible();
+
+  const picker = page.getByLabel("Compare against the score as of");
+  await expect(picker.locator("option")).not.toHaveCount(0);
+  await picker.selectOption({ index: 1 }); // index 0 is the placeholder
+  await page.getByRole("button", { name: "Compare" }).click();
+
+  await expect(page.getByText(/%\s*→\s*[\d.]+%/)).toBeVisible(); // "12.3% → 14.0% (▲ 1.7 pts)"
+  await expect(page.getByText("Contribution change")).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("approving a draft says right away what happened, including when nothing was sent", async ({ page }) => {
+  // Found while taking the walkthrough screenshots: with outbound off, Approve made the draft vanish from the
+  // "drafted" list and the reason was only visible after switching the filter -- so it looked as if it had been sent.
+  await signIn(page, OPERATOR);
+  await page.getByRole("link", { name: "Drafts" }).click();
+  const cards = page.locator("article.draft");
+  await expect(cards.first()).toBeVisible();
+  const before = await cards.count();
+  await cards.first().getByRole("button", { name: "Approve & send" }).click();
+
+  const notice = page.locator(".draft-notice");
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText("Not sent: outbound email is switched off");
+  await expect(cards).toHaveCount(before - 1); // it left the "drafted" list, and the notice is what tells you why
+  await page.getByLabel("Show").selectOption("outbound_disabled");
+  await expect(page.locator("article.draft").first()).toBeVisible(); // and it is findable under its new state
+});
+
 test("an account shows its drivers and evidence, and the CSM's judgement is recorded and the account can be suppressed", async ({ page }) => {
   await signIn(page, OPERATOR);
   const first = page.locator("table tbody tr").first().getByRole("link");

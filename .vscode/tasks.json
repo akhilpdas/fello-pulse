@@ -74,6 +74,43 @@
       "problemMatcher": []
     },
     {
+      "label": "Pulse: mail inbox (Mailpit - http://localhost:8025)",
+      "type": "shell",
+      "command": "mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025",
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "pulse-demo",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: API with local mail (sends to Mailpit)",
+      "type": "shell",
+      "command": "source .venv/bin/activate && PGTZ=UTC PULSE_SMTP_HOST=127.0.0.1 PULSE_SMTP_PORT=1025 PULSE_SMTP_STARTTLS=false uvicorn pulse.api.main:app --port 8000 --reload",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "pulse-demo",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pulse: 3b. run the demo with local mail (Mailpit + API + UI)",
+      "dependsOn": [
+        "Pulse: mail inbox (Mailpit - http://localhost:8025)",
+        "Pulse: API with local mail (sends to Mailpit)",
+        "Pulse: UI (http://localhost:5173)"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
       "label": "Pulse: 4. unattended worker (the agent: cycles every 15 min, nobody triggers it)",
       "type": "shell",
       "command": "source .venv/bin/activate && PGTZ=UTC python3 -m pulse.cli serve --simulate-present",
