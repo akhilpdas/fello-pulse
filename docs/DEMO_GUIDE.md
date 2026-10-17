@@ -5,6 +5,8 @@ for the first time. (`README.md` is the engineering summary; `HANDOFF.md` is the
 
 ## What you are looking at
 
+> **Want to test every feature yourself, step by step?** Use [`Pulse_Test_Walkthrough.docx`](Pulse_Test_Walkthrough.docx) (with screenshots) — it covers sign-in and roles, the queue, browsing and history, drafts and real email (via a local Mailpit inbox), the autonomous agent, admin, and the live-LLM test.
+
 A system that, every cycle and without anyone asking, scores each customer account's risk of churning or shrinking within 90
 days, ranks the accounts a CSM should act on this week, shows **why** (down to the source records), drafts a first message, and
 lets a human approve it. Three simulated customer organisations (tenants), ~5,000 accounts, ~350,000 events from five sources.
@@ -38,6 +40,19 @@ docker compose run --rm api python3 -m pulse.cli bootstrap-demo   # builds the e
 
 Only one of A/B/C can use port 5173 at a time (`docker compose down` to free it).
 
+### Give the demo some history (once, ~12 minutes)
+
+A freshly built demo has **one** scoring snapshot per tenant, so "since last cycle" reads *new* for every row, **What moved** has nothing to compare, and the **Week** picker has one entry.
+To get eight earlier weekly snapshots:
+
+```bash
+cd backend && source .venv/bin/activate && export PGTZ=UTC
+python3 -m pulse.cli backfill --weeks 8          # scores only: no drafts, no sends, no run-log rows; safe to re-run
+```
+
+Caveat to say out loud: the model was trained on these same weeks, so the backfilled scores are **in-sample** — they flatter the model. They are there to browse and compare, not to measure it.
+In the containers: `docker compose run --rm api python3 -m pulse.cli backfill --weeks 8`. The demo database built before 2026-10-17 has already been backfilled; a rebuild (`RESET` + task 2) has not.
+
 ## Sign in
 
 The sign-in asks for a **workspace** (the customer organisation), an **email** and a **password**.
@@ -62,7 +77,8 @@ Every demo user in a database shares one password. **It is never in git.** Where
 ## Guided tour (about 6 minutes)
 
 1. **Sign in as the Northwind operator.** The queue is a short, ordered list — bounded to the weekly capacity, with "N more below the cut". Columns: tier, risk, value at risk,
-   renewal distance, *why* (the dominant driver), and the change since the last cycle.
+   renewal distance, *why* (the dominant driver), and the change since the last cycle. The **Week** picker above it opens any earlier week's queue (needs the backfill above).
+   Under the table, **Browse all accounts →** opens the whole ranking, not just the weekly head: page through it, search by name, filter by tier or driver. Ranks carry on past the cut (51, 52, …), and rows inside this week's queue are marked in bold.
 2. **Open the top account.** Driver bars show what is pushing the score; **Evidence** lists the source records behind each driver — open one to see the original payload.
    **What moved** compares two dates. *Every number resolves to a record.*
 3. **Your judgement.** "Confirm risk is real" / "Mark false positive" are stored as labels. "Suppress from queue" hides the account for N days — it leaves the queue but is still scored.
@@ -78,10 +94,13 @@ Every demo user in a database shares one password. **It is never in git.** Where
 
 - **The model that ranks accounts is not a language model.** It is a gradient-boosted tree classifier (scikit-learn), calibrated, with per-feature SHAP attributions summed into six
   business drivers. A language model **never ranks, scores, tiers or filters** anything — the ranking code cannot import it, and the system produces identical scores with it off, on, or failing.
-- **A language model only writes.** It drafts the *prose* of the first-move message from a short list of facts the system already derived. It is **Claude (Anthropic)**, through the
-  Anthropic SDK. The default model id is **`claude-sonnet-5-5`** (set `PULSE_LLM_MODEL` to change it).
-- **It is off by default.** Without a key every draft is a deterministic template, and the whole system works. To turn it on: `pip install -e ".[llm]"`, then
-  `PULSE_LLM_ENABLED=true PULSE_LLM_API_KEY=<your key>` and run a cycle (`python3 -m pulse.cli cycle`, or the worker). Drafts then show `draft_source: llm` and the model name.
+- **A language model only writes.** It drafts the *prose* of the first-move message from a short list of facts the system already derived.
+- **It is off by default.** Without a model every draft is a deterministic template, and the whole system works.
+- **Which model — you choose, and a paid key is not required.**
+  - **Free and local (verified):** install Ollama (`brew install ollama`, `ollama pull qwen2.5:7b`), then
+    `PULSE_LLM_ENABLED=true PULSE_LLM_PROVIDER=openai_compatible PULSE_LLM_BASE_URL=http://127.0.0.1:11434/v1 PULSE_LLM_MODEL=qwen2.5:7b` and run a cycle (`python3 -m pulse.cli cycle`, or the worker). Drafts then show `draft_source: llm` and the model name.
+    Any other OpenAI-style endpoint (LM Studio, Groq, OpenRouter, Gemini's compatible endpoint) works the same way with `PULSE_LLM_API_KEY`.
+  - **Anthropic Claude (later, if wanted):** `PULSE_LLM_PROVIDER=anthropic PULSE_LLM_API_KEY=<key>` (default model `claude-sonnet-5-5`; `pip install -e ".[llm]"`). Not yet run against the real API.
 - **Guardrails:** the model sees only derived facts (never ticket or email text); its reply is rejected — and the template used instead — if it contains any number, link, markup or
   claim that is not traceable to those facts; calls are capped per cycle and a failing provider trips a breaker.
 
@@ -91,8 +110,8 @@ Every demo user in a database shares one password. **It is never in git.** Where
 |---|---|
 | Sign-in, sessions, roles, per-CSM scoping, audit | **Real**, tested, and exercised in a browser |
 | Scoring, ranking, evidence trail, the unattended worker | **Real** |
-| Email delivery code (SMTP, send gate, demo mode, opt-outs) | **Built and tested against a fake mail server. No real email has been sent.** Verify with `python3 -m pulse.cli send-test --to <your own address>` after setting `PULSE_SMTP_HOST/PORT/USER/PASSWORD` |
-| Language-model drafting | **Built and tested against scripted replies. No real model call has been made.** Verify as above, with a key |
+| Email delivery code (SMTP, send gate, demo mode, opt-outs) | **Verified over real SMTP against a local mail server (Mailpit), including an unattended send. No real provider has been used.** Verify with `python3 -m pulse.cli send-test --to <your own address>` after setting `PULSE_SMTP_HOST/PORT/USER/PASSWORD` |
+| Language-model drafting | **Run for real against a free local model (Ollama, `qwen2.5:7b`)**: 20 drafts in one cycle, all passed the guardrails. The Anthropic provider has not been run against the real API |
 | Containers | Built and run on one machine (arm64/Colima); no amd64 build |
 | The customer data | Simulated (a generator); addresses are `@example.com` — nothing can reach a real person |
 

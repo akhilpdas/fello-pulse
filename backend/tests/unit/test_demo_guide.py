@@ -45,7 +45,10 @@ def test_it_names_the_language_model_exactly_as_the_code_defaults_it_and_says_wh
 def test_it_is_honest_about_what_is_real_and_what_is_a_stand_in():
     t = _text().lower()
     assert "send-test" in t
-    assert re.search(r"no real (email|message)", t) and re.search(r"no real (model|llm|language-model)", t)
+    # Email has run over real SMTP against a local server, and a free local model has run for real -- so the guide must now
+    # say precisely what is still unproven: no real mail *provider*, and the Anthropic provider never run against the real API.
+    assert re.search(r"no real (mail |email )?provider", t)
+    assert "has not been run against the real api" in t
 
 
 def test_it_has_a_guided_tour_and_the_readme_points_to_it():

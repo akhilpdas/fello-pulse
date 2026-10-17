@@ -617,3 +617,44 @@ Installed Colima + the Docker CLI with Homebrew (no admin password, no GUI) and 
 - the 9 browser scenarios pass against the containers (`infra/scripts/e2e_docker.sh`); data persists across `down`/`up`.
 **Not covered:** amd64, vulnerability scanning, the SC-012 ten-minute timing, a real SMTP provider or model key inside the stack.
 Colima is still installed and may be running (`colima status`; `colima stop` to free its 8 GB / 4 CPUs; `docker compose down -v` also deletes the stack's data volumes).
+
+
+---
+
+## Browse, history and week picker (2026-10-17, after close-out)
+
+Found by running the demo by hand: the queue showed "2490 more below the cut" with no way to open them, no way to see an earlier week, and "since last cycle" / **What moved** had nothing to compare (one snapshot per tenant).
+All three built test-first (`superpowers:test-driven-development`):
+
+- `GET /queue/all` (paged, filter by tier/driver, name search, absolute `rank`, `in_queue`), `GET /queue/snapshots`; `pulse.scoring.backfill` + `pulse backfill --weeks N` (scores only, in-sample caveat). openapi.yaml and `schema.d.ts` regenerated.
+- UI: *All accounts* page (`/browse`), Week picker on both pages (shared through `?as_of=`), "Browse all accounts →" link. Pure helpers in `lib/browse.ts`.
+- **Counts:** backend 479 · frontend 39 · browser 11 (two new scenarios; watched RED first for the missing link/picker). Browser suite run twice, stable.
+- **Not test-first, said so in the tests:** the tie-order guard and the "earlier snapshot shows deltas" test passed on first run (behaviour already existed); the tie-order one is mutation-checked. Two of my own browser assertions raced the 250 ms search debounce; fixed in the test, not the product.
+- **Demo database `pulse` was backfilled** (9 snapshots per tenant, actions 505 / runs 3 unchanged). Containers and fresh `run_all.sh` builds are not.
+- **Open:** `.vscode/tasks.json` has a stray edit (`/opt/h omebrew/...`, a space inside the Postgres path) that is not part of this work.
+
+
+---
+
+## Email verified locally, "What moved" fixed, walkthrough written (2026-10-17, later)
+
+- **Email against a real SMTP server (Mailpit, `brew install mailpit`):** send-test, human approve (demo redirect, `[DEMO → …]` subject, footer, no double send), opt-out, demo-off delivery, reject, no-recipient, and an **unattended cycle that sent 30 messages with the play allowlisted** — all verified on a scratch copy of the demo DB (since dropped). Still **not** a real provider (no STARTTLS/auth/bounces) and **no live LLM call** (needs a key). New VS Code tasks: *mail inbox (Mailpit)*, *API with local mail*, *3b. run the demo with local mail*. clarifications B-29 addendum.
+- **Bug found by reading code while writing the guide, fixed test-first:** "What moved" matched an exact stored timestamp but offered a minute-precision date picker, so every comparison from the UI was a 404. Now a dropdown of weeks that exist, sending the stored timestamp untouched. Browser scenario added (watched RED, then green).
+- **Finding, not fixed (design decision) — clarifications B-30:** "now" is `max(received_at)` over all sources; stray Salesforce events set it to 2026-11-10 while product/support/billing/email end 10-12…10-19, so the newest snapshot sees weeks of silence everywhere (Northwind: 144 red vs 15 the week before). The headline queue is partly an artifact. Options (a)/(b)/(c) are written up there.
+- **e2e no longer collides with a running demo:** own ports (API 8100, UI 8173, `PULSE_E2E_*_PORT`), and it copies the DB with dump/restore (a template copy is refused while the demo is connected). 12 browser scenarios pass alongside a live demo.
+- **`docs/TEST_WALKTHROUGH.md`** — the step-by-step manual test guide (parts A–G + a checklist). Claims in it were checked against the code (rate limit: 5 failures then 429 verified live).
+- **Not committed.** Files changed since the last commit: browse/history/week-picker work (previous entry) plus this entry.
+
+
+---
+
+## B-30 fixed, free-model drafting, screenshot walkthrough (2026-10-17, evening)
+
+- **B-30 fixed, test-first** (`tests/integration/test_data_present.py`, 9 tests): "now" for a simulated-present run = the earliest, across sources, of each source's newest `received_at` (`pulse.ingest.present.data_present`), used by `pulse cycle`, `pulse serve --simulate-present` and the demo build. On this data that is 2026-10-12 = the generator manifest's `dataset_end`. **The demo database was rebuilt and re-backfilled**: 9 weekly snapshots 17 Aug → 12 Oct; the newest Northwind snapshot now has 7 red accounts and mean risk 0.039 (it was 144 and 0.082). The 6 drafts approved earlier were lost in the rebuild; sign-in password unchanged.
+- **Second LLM provider, test-first** (`test_openai_compatible_client.py`, `test_llm_provider_selection.py`; clarifications B-31): `PULSE_LLM_PROVIDER=openai_compatible` + `PULSE_LLM_BASE_URL`; stdlib only; key optional for local models. **Run for real** against Ollama + `qwen2.5:7b`: direct calls 2–4 s; one full cycle = 20 model-written drafts, 20 accepted, 0 fallbacks, 148 s for three workspaces. Anthropic provider unchanged and still never run against the real API. Ollama and Mailpit are installed with Homebrew (`brew services` not enabled; start with `ollama serve`, `mailpit`).
+- **UX bug found by the screenshot run, fixed test-first:** approving a draft with outbound off made it silently vanish from the "drafted" list (the reason was visible only under another filter). The Drafts page now shows a notice with the outcome right after Approve/Reject/Save (`.draft-notice`). Browser scenario added.
+- **`docs/Pulse_Test_Walkthrough.docx` (+ `.pdf`)**: the step-by-step guide with 26 screenshots (red outlines show what to click). Source: `docs/walkthrough/Pulse_Test_Walkthrough.md`; screenshots: `docs/walkthrough/capture.mjs` (+ `capture-llm.mjs`) run against a **scratch copy** of the data; build: `bash docs/walkthrough/build.sh` (pandoc + LibreOffice). `docs/TEST_WALKTHROUGH.md` is now a pointer.
+- **Counts:** backend 488+ (see the run below), frontend 39, browser 13 (own ports 8100/8173; run alongside a live demo).
+- **Hosting research (nothing deployed):** AWS new accounts get $100–$200 credits on a Free Plan that ends after 6 months or when credits are spent (then the account closes); a 4 GB Graviton server (t4g.medium) is ~$25–30/month, so credits cover a short review. Cloudflare quick tunnel from the Mac is free but ephemeral. Oracle's free ARM tier was reportedly halved. Render free does not fit (sleeps; no free worker; DB expires in 30 days).
+- **Observation to decide on:** the weekly queue's top 12 are mostly green/amber large renewals (priority = risk × value × urgency; only ~7 accounts clear the red threshold 0.32). By design, but it reads oddly in a demo about "red accounts".
+- **Not committed.**

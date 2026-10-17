@@ -589,3 +589,38 @@ Per-tenant test ROC-AUC: globex 0.745, initech 0.546, northwind 0.678. Cold star
 northwind 0.672 / 0.090, **initech 0.528 / 0.044** — a small new tenant gets almost no benefit from a model trained on the others. Captured value at the
 operating point is 4.6% of value at risk. These supersede the cold-start figures in B-25 (which came from a differently-ordered build).
 
+
+**B-29 addendum (2026-10-17) — verified against a real SMTP server, still not against a real provider.** Mailpit (a local mail server, real SMTP over a real socket)
+received: a `pulse send-test` message; a human approval (demo mode: redirected to the test inbox, subject tagged `[DEMO → <real recipient>]`, opt-out footer,
+a second approve sent nothing); an opted-out contact (`opted_out`, nothing sent); demo mode off (delivered to the real contact's address); and an unattended cycle
+with `adoption_nudge` allowlisted, which sent 30 messages (the per-cycle cap) with nobody approving. STARTTLS, authentication and a hosted provider's behaviour
+(rate limits, bounces, spam filtering) were **not** exercised.
+
+### B-30 — "Now" is set by the newest event of any source, and the demo's newest source is far ahead of the rest (found while writing the test walkthrough)
+
+**What we found.** The cycle, the worker's `--simulate-present` clock and the backfill anchor all take "now" as `max(received_at)` over every source. In the demo
+data that is **2026-11-10**, set by a handful of Salesforce events (5, 5, 5 and 2 per week for the last four weeks). The broad activity stops earlier: product
+2026-10-19, Zendesk 2026-10-13, Gmail 2026-10-13, Stripe 2026-10-12. So the newest snapshot sees ~3 weeks of silence from four sources, every account looks
+disengaged, and it flags **144 red accounts for Northwind against 15 the week before** (mean probability 0.082 against 0.043). The week-over-week jump in "What
+moved" and the size of today's red list are largely this artifact, not customer behaviour.
+**FIXED 2026-10-17 (see below).** Candidates considered: (a) "now" = the **minimum** over connected sources of each source's newest event (conservative; here
+2026-10-12); (b) "now" = the newest date at which most sources still have data; (c) leave it and have the generator stop emitting events past its own data end.
+Whichever is chosen needs a test (a source that lags must not drag "now" forward) and a rebuild of the demo scores; the model itself is unaffected (it trains on
+panel rows that stop at the censoring horizon).
+**Until then:** the walkthrough tells the tester that the latest week is inflated, and the 2026-10-20 or 2026-10-13 snapshots are the representative ones.
+
+**B-30 resolution (2026-10-17).** Chose (a): `pulse.ingest.present.data_present` = the earliest, across sources, of each source's newest `received_at` (over the ingested tenants), used by `pulse cycle`
+(default), `pulse serve --simulate-present` and therefore `bootstrap-demo`/`run_all.sh`. On this data it is 2026-10-12 — exactly the generator manifest's `dataset_end`. A source that runs ahead
+(the CRM owner-change events out to 2026-11-07) can no longer pull "now" forward; a source with no events is ignored. Nine tests (`test_data_present.py`), written first. The demo database was rebuilt:
+the newest Northwind snapshot now has **7 red accounts and a mean risk of 0.039**, in line with the eight weeks before it (4–10 red, 0.039–0.040), instead of 144 and 0.082. Production runs are unaffected
+(they use the wall clock). **Trade-off, stated:** one source that has genuinely stopped sending data would hold "now" back — acceptable for simulated data whose present is not the wall clock, and visible in `/admin/coverage`.
+
+### B-31 — A second language-model provider, so the demo does not need a paid key (2026-10-17)
+
+**Chosen.** `OpenAICompatibleClient` (standard library only, no new dependency) behind the existing `LlmClient` interface: any server with an OpenAI-style `/chat/completions` endpoint — Ollama and
+LM Studio (local, free, no key), or a hosted provider with a free tier. `PULSE_LLM_PROVIDER` (`anthropic` default | `openai_compatible`) and `PULSE_LLM_BASE_URL`; a key is optional only for `openai_compatible`.
+Every guardrail is unchanged because they live in the drafter, not the client: grounding validation, call budget, circuit breaker, template fallback, and the rule that ranking cannot import it. Misconfiguration
+(unknown provider, missing base URL, non-http URL) degrades to templates rather than raising.
+**Verified for real:** Ollama + `qwen2.5:7b` — direct drafter calls (2–4 s each) and a full cycle (20 drafts, 20 accepted, 0 fallbacks, 148 s for three workspaces).
+**Limits.** A 7B local model writes plainer, sometimes slightly awkward prose ("Your CSM, Your CSM" appeared once); the validator accepts it because it asserts nothing unsupported — grounding is not style.
+The Anthropic provider is unchanged and still unrun against the real API. Free hosted tiers and their limits change; none was exercised.

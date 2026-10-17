@@ -1,0 +1,21 @@
+// One extra screenshot: a draft written by the local model (run after a cycle with the model enabled on the scratch copy).
+import { chromium } from "../../frontend/node_modules/@playwright/test/index.mjs";
+const UI = process.env.UI ?? "http://127.0.0.1:8273";
+const PW = process.env.PW;
+const OUT = new URL("./img/", import.meta.url).pathname;
+const browser = await chromium.launch({ channel: "chrome", headless: true });
+const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1.5 })).newPage();
+await page.goto(UI + "/");
+await page.getByLabel("Workspace").fill("northwind");
+await page.getByLabel("Email").fill("csm00@northwind.example.com");
+await page.getByLabel("Password").fill(PW);
+await page.getByRole("button", { name: "Sign in" }).click();
+await page.getByRole("link", { name: "Drafts" }).click();
+await page.locator("article.draft").first().waitFor();
+const llm = page.locator("article.draft", { hasText: "Drafted by llm" }).first();
+await llm.waitFor();
+await llm.evaluate((el) => { el.scrollIntoView({ block: "start" }); el.style.outline = "3px solid #e11d48"; el.style.outlineOffset = "3px"; });
+await page.waitForTimeout(300);
+await page.screenshot({ path: `${OUT}26-drafts-llm.png` });
+await browser.close();
+console.log("captured 26-drafts-llm");

@@ -97,10 +97,12 @@ about 105 s against a 15-minute interval), SC-008–SC-014. **Not met — SC-005
 **lead time is not reported** (`GET /model` says so). SC-004 (calibration tolerance) is reported as a reliability curve but its tolerance is not asserted.
 
 **Not verified — stated so nobody assumes otherwise:**
-- **No real email has ever been sent** by this system, and **no real language-model call has ever been made.** Both are exercised only against stand-ins (an in-process
-  fake SMTP server; scripted model replies). The real SMTP path and the 15-line Anthropic adapter have never run against a real provider. **To verify real email in one minute:** set `PULSE_SMTP_HOST`,
-  `PULSE_SMTP_PORT`, `PULSE_SMTP_USER`, `PULSE_SMTP_PASSWORD` for a provider you have an account with, then `python3 -m pulse.cli send-test --to <your own address> --sender <an address the provider lets you send from>` —
+- **No real email has been sent to a real provider.** Email *has* now been exercised over real SMTP against a local mail server (Mailpit): a test message, a human approval in demo mode, an opt-out, demo-mode-off delivery,
+  and an unattended cycle that sent 30 messages on its own with a play allowlisted. Not exercised: TLS/STARTTLS, authentication, provider rate limits, bounces, spam filtering. **To verify a real provider in one minute:** set `PULSE_SMTP_HOST`,
+  `PULSE_SMTP_PORT`, `PULSE_SMTP_USER`, `PULSE_SMTP_PASSWORD`, then `python3 -m pulse.cli send-test --to <your own address> --sender <an address the provider lets you send from>` —
   it sends one labelled test message, touches no customer or database, and reports delivered / refused / unconfirmed.
+- **Language-model drafting has run for real against a free local model, not against Anthropic.** `PULSE_LLM_PROVIDER=openai_compatible` + `PULSE_LLM_BASE_URL` selects any OpenAI-style endpoint (Ollama, LM Studio, Groq, OpenRouter, Gemini's
+  endpoint); with Ollama and `qwen2.5:7b` a full three-workspace cycle wrote 20 drafts, all 20 accepted by the guardrails, 0 fallbacks. The Anthropic adapter (`PULSE_LLM_PROVIDER=anthropic`, the default) has still never run against the real API.
 - **The containers were run on one machine only** (arm64, Colima) — see *Containers* for what that did and did not cover; no amd64 build.
 - The browser tests cover the main paths and the key refusals in **Chrome only** — no other browser, no mobile layout, no accessibility audit.
 - The shared login limiter is tested with two limiter objects, not two real processes. Nothing has been load-tested; the 10× claim below is arithmetic from one measurement.
@@ -128,6 +130,8 @@ about 105 s against a 15-minute interval), SC-008–SC-014. **Not met — SC-005
 - **Model:** lead time is not reported and the planted retrospective accounts are missed (above); no per-tenant model; the cold-start result for small tenants is weak.
 - **Data quality:** account names are not unique within a tenant (309 repeated names in the Northwind demo estate, as in a real CRM) and the queue shows no disambiguator; accounts the CRM has no record of are drafted
   for and greeted by their external reference ("Hi northwind-01261") — the send gate blocks them (no contact) but a CSM still sees such drafts, about 11% of the list.
+- **History:** the queue's history is whatever snapshots exist. A fresh build has one; `pulse backfill --weeks N` adds earlier weeks, but those scores are **in-sample** (the model trained on those weeks), so they are for browsing and comparing, never for judging the model. `run_all.sh` does not run the backfill (it adds ~12 minutes).
+- **Browsing:** the *All accounts* view lists scored, non-suppressed accounts only — suppressed accounts and the low-confidence ones live on their own pages; there is no export and no saved filters.
 - **Operations:** a whole-tenant cycle is one transaction (one bad account fails the tenant's cycle); a persistently failing tenant is retried every 30 s with no backoff; login attempts and
   the audit trail are not exported or paginated beyond the last 200 events.
 - **Containers:** verified on arm64 only; no amd64 build, no scan, no timing of the clean-machine path (see *Containers*).
