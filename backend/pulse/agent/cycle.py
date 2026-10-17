@@ -112,16 +112,21 @@ def _make_llm(session: Session, factory, enabled: bool, api_key):
     and only when a key is configured, so the scoring path can never reach it."""
     if factory is not None:
         return factory()
-    if not (enabled and api_key):
+    if not enabled:
         return None
-    key = api_key.get_secret_value() if hasattr(api_key, "get_secret_value") else str(api_key)
-    if not key.strip():  # a blank key (even whitespace) is no key
+    settings = get_settings()
+    key = ""
+    if api_key:
+        key = api_key.get_secret_value() if hasattr(api_key, "get_secret_value") else str(api_key)
+    # A hosted provider needs a key (a blank one, even whitespace, is none); a local OpenAI-compatible model does not.
+    if not key.strip() and settings.llm_provider != "openai_compatible":
         return None
     from pulse.agent.llm_drafter import LlmUnavailable, build_llm_drafter
 
     calls = session.execute(text("SELECT llm_calls_per_cycle FROM tenant_config")).scalar() or 50
     try:
-        return build_llm_drafter(key, model=get_settings().llm_model, max_calls=calls)
+        return build_llm_drafter(key.strip(), model=settings.llm_model, max_calls=calls,
+                                 provider=settings.llm_provider, base_url=settings.llm_base_url)
     except LlmUnavailable:
         return None
 

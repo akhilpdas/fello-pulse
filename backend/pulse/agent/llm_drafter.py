@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+import urllib.request
 from typing import Protocol
 
 from pulse.agent.drafter import _TEMPLATES, Draft, validate_llm_output
@@ -133,6 +134,45 @@ class AnthropicClient:
         return "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
 
 
-def build_llm_drafter(api_key: str, *, model: str, max_calls: int, timeout: float = 15.0) -> LlmDrafter:
-    """The drafter a cycle uses when the feature is enabled and keyed. Raises ``LlmUnavailable`` if it cannot be built."""
-    return LlmDrafter(AnthropicClient(api_key), model=model, max_calls=max_calls, timeout=timeout)
+class OpenAICompatibleClient:
+    """Any server that speaks the OpenAI-style ``/chat/completions`` protocol: Ollama and LM Studio (local, free, no key),
+    or a hosted provider with a free tier (Groq, OpenRouter, Google's Gemini endpoint). Standard library only -- no SDK,
+    no new dependency. The key is optional because a local model has none."""
+
+    def __init__(self, base_url: str, api_key: str | None = None) -> None:
+        if not (base_url or "").startswith(("http://", "https://")):
+            raise LlmUnavailable("llm_base_url must be an http(s) URL, e.g. http://localhost:11434/v1")
+        self._url = base_url.rstrip("/") + "/chat/completions"
+        self._key = api_key or None
+
+    def __repr__(self) -> str:
+        return f"OpenAICompatibleClient(url={self._url!r}, api_key=<hidden>)"
+
+    def complete(self, system: str, user: str, *, model: str, max_tokens: int, timeout: float) -> str:
+        body = json.dumps({
+            "model": model, "max_tokens": max_tokens, "temperature": 0.2,  # low: a small model then keeps to the format
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        }).encode()
+        headers = {"Content-Type": "application/json"}
+        if self._key:
+            headers["Authorization"] = f"Bearer {self._key}"
+        req = urllib.request.Request(self._url, data=body, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - scheme checked in __init__
+            data = json.load(resp)
+        return data["choices"][0]["message"]["content"] or ""
+
+
+def build_llm_drafter(
+    api_key: str, *, model: str, max_calls: int, timeout: float = 15.0,
+    provider: str = "anthropic", base_url: str | None = None,
+) -> LlmDrafter:
+    """The drafter a cycle uses when the feature is enabled. Raises ``LlmUnavailable`` if it cannot be built."""
+    if provider == "anthropic":
+        client: LlmClient = AnthropicClient(api_key)
+    elif provider == "openai_compatible":
+        if not base_url:
+            raise LlmUnavailable("llm_provider=openai_compatible needs llm_base_url")
+        client = OpenAICompatibleClient(base_url, api_key)
+    else:
+        raise LlmUnavailable(f"unknown llm_provider {provider!r} (use 'anthropic' or 'openai_compatible')")
+    return LlmDrafter(client, model=model, max_calls=max_calls, timeout=timeout)

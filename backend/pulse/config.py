@@ -113,6 +113,10 @@ class Settings(BaseSettings):
     llm_enabled: bool = False
     llm_model: str = "claude-sonnet-5-5"
     llm_api_key: SecretStr | None = None
+    # Which provider speaks for the model. "anthropic" (default; needs a key) or "openai_compatible" -- any server with an
+    # OpenAI-style /chat/completions endpoint: Ollama/LM Studio (local, free, no key), Groq, OpenRouter, Gemini's endpoint.
+    llm_provider: str = "anthropic"
+    llm_base_url: str | None = None  # e.g. http://localhost:11434/v1 for Ollama
 
     # Sessions (002 / FR-008). Opaque, DB-backed, revocable.
     session_hours: int = 12
