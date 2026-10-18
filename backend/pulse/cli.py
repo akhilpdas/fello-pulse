@@ -276,6 +276,151 @@ def cmd_bootstrap_demo(args) -> int:
     return 0
 
 
+def _libpq_dsn() -> str:
+    from pulse.config import get_settings
+    return get_settings().database_url_owner.replace("postgresql+psycopg://", "postgresql://")
+
+
+def _seed_tables(session) -> list[str]:
+    from pulse.seed import EXCLUDED_TABLES
+    names = [r[0] for r in session.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1")).all()]
+    return [n for n in names if n not in EXCLUDED_TABLES]
+
+
+def _seed_row_counts(session) -> dict[str, int]:
+    return {t: session.execute(text(f'SELECT count(*) FROM "{t}"')).scalar() for t in _seed_tables(session)}
+
+
+def cmd_export_seed(args) -> int:
+    """Dump the built demo database (data only; no sessions, no login attempts) with a manifest that describes the file."""
+    import subprocess
+    from datetime import date
+
+    from pulse.seed import SeedError, export_seed
+
+    with owner_session() as s:
+        revision = s.execute(text("SELECT version_num FROM alembic_version")).scalar()
+        counts = _seed_row_counts(s)
+        outbound = s.execute(text("SELECT count(*) FROM tenant_config WHERE outbound_enabled")).scalar()
+        by_source = dict(s.execute(text("SELECT draft_source, count(*) FROM action GROUP BY 1")).all())
+        model = s.execute(text("SELECT draft_model FROM action WHERE draft_source <> 'template' AND draft_model IS NOT NULL"
+                               " GROUP BY 1 ORDER BY count(*) DESC LIMIT 1")).scalar()
+    today = date.today().isoformat()
+    drafts = {"model": model, "date": today, "template": by_source.get("template", 0),
+              "llm": sum(n for k, n in by_source.items() if k != "template")}
+    try:
+        m = export_seed(dsn=_libpq_dsn(), out=Path(args.out), revision=revision, row_counts=counts, drafts=drafts,
+                        created=today, outbound_enabled_tenants=outbound, run=subprocess.run,
+                        artifacts_dir=Path(args.artifacts))
+    except SeedError as exc:
+        print(f"not exported: {exc}")
+        return 1
+    size = Path(args.out).stat().st_size / 1048576
+    print(f"wrote {args.out} ({size:.0f} MB) and {args.out}.json\n  schema revision {m.schema_revision}, sha256 {m.sha256[:16]}…, "
+          f"{counts.get('account', 0)} accounts, {counts.get('score', 0)} scores\n  drafts: {drafts['llm']} model-written"
+          f"{' by ' + drafts['model'] if drafts['model'] else ''}, {drafts['template']} template")
+    return 0
+
+
+def cmd_load_seed(args) -> int:
+    """Load a seed into a migrated database in minutes. ``--overwrite`` replaces data already there (the owner's reset)."""
+    import secrets
+    import tempfile
+    import urllib.request
+
+    from pulse.auth.passwords import hash_password
+    from pulse.seed import Manifest, SeedError, load_seed, restore_stream
+
+    workdir = Path(tempfile.mkdtemp(prefix="seed-"))
+    if args.url:
+        if not args.url.startswith("https://"):
+            print("--url must be an https:// address")
+            return 1
+        file = workdir / "seed.dump"
+        print(f"downloading {args.url} …", flush=True)
+        urllib.request.urlretrieve(args.url, file)                       # noqa: S310 - https only, checked above
+        urllib.request.urlretrieve(args.url + ".json", workdir / "seed.dump.json")  # noqa: S310
+        try:
+            urllib.request.urlretrieve(args.url + ".artifacts.tar.gz", workdir / "seed.dump.artifacts.tar.gz")  # noqa: S310
+        except OSError:
+            pass                                                     # a seed without a model: the manifest says so
+        manifest_path = workdir / "seed.dump.json"
+    else:
+        file = Path(args.file)
+        manifest_path = file.with_name(file.name + ".json")
+    manifest = Manifest.from_json(manifest_path.read_text())
+
+    password = args.demo_password or os.environ.get("PULSE_DEMO_PASSWORD") or None
+    generated = password is None
+    if generated:
+        password = secrets.token_urlsafe(12)
+
+    session = owner_session().__enter__()                                  # one connection for the whole load
+    try:
+        tenants = session.execute(text("SELECT count(*) FROM tenant")).scalar()
+        revision = session.execute(text("SELECT version_num FROM alembic_version")).scalar()
+
+        def truncate():
+            names = ", ".join(f'"{t}"' for t in [r[0] for r in session.execute(
+                text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'alembic_version'")).all()])
+            session.execute(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
+            session.commit()
+
+        def set_passwords(pw):
+            session.execute(text("UPDATE app_user SET password_hash = :h, password_changed_at = now()"), {"h": hash_password(pw)})
+            session.commit()
+
+        def counts():
+            session.commit()                                               # see what pg_restore (another connection) wrote
+            return _seed_row_counts(session)
+
+        try:
+            load_seed(file=file, manifest=manifest, dsn=_libpq_dsn(), tenant_count=tenants, db_revision=revision,
+                      overwrite=args.overwrite, demo_password=password, restore=restore_stream, truncate=truncate,
+                      set_passwords=set_passwords, row_counts=counts, artifacts_dest=Path(args.artifacts))
+        except SeedError as exc:
+            print(f"not loaded: {exc}")
+            return 1
+    finally:
+        session.close()
+    print(f"loaded: {manifest.row_counts.get('account', 0)} accounts, {manifest.row_counts.get('score', 0)} scores "
+          f"(seed of {manifest.created}).")
+    if manifest.drafts.get("llm"):
+        print(f"  {manifest.drafts['llm']} drafts were written by {manifest.drafts.get('model')} on {manifest.drafts.get('date')}; "
+              f"{manifest.drafts.get('template', 0)} are templates.")
+    print("Sign in (workspace = northwind, globex or initech) as csm00@<workspace>.example.com; "
+          + (f"password: {password}   (shown once)" if generated else "with the password you supplied"))
+    return 0
+
+
+def cmd_llm_check(args) -> int:
+    """One real call through the configured language-model provider: does the key work, how fast, what limits."""
+    from pulse.llm_check import check_llm
+
+    s = get_settings()
+    key = s.llm_api_key.get_secret_value() if s.llm_api_key else None
+    r = check_llm(provider=s.llm_provider, base_url=s.llm_base_url, model=s.llm_model, api_key=key, timeout=30.0)
+    print(f"provider {r.provider}, model {r.model}" + (f", endpoint {s.llm_base_url}" if s.llm_base_url else ""))
+    if r.ok:
+        print(f"OK in {r.latency_ms} ms; the model replied: {r.reply!r}")
+        if r.limits:
+            print("limits the provider reported (observed, not assumed):")
+            for k, v in r.limits.items():
+                print(f"  {k}: {v}")
+        else:
+            print("the provider sent no rate-limit headers")
+        return 0
+    print(f"FAILED ({r.kind}): {r.detail}")
+    advice = {"no_key": "Set PULSE_LLM_API_KEY (a free Groq key is enough). See .env.example.",
+              "unauthorized": "The key was rejected: check it, and that it is for this provider.",
+              "rate_limited": "The free limit is used up for now; wait, or the drafts fall back to templates.",
+              "timeout": "Too slow: a local model may still be loading; try again.",
+              "unreachable": "Nothing answered: is the server running, and the URL right (Docker needs host.docker.internal)?"}
+    if r.kind in advice:
+        print(advice[r.kind])
+    return 1
+
+
 def cmd_send_test(args) -> int:
     """Send one clearly labelled test message through the configured mail provider and say exactly how it went.
 
@@ -306,7 +451,7 @@ def cmd_send_test(args) -> int:
     return 1
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="pulse")
     sub = ap.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("bootstrap"); b.add_argument("--feeds", default="../data/feeds")
@@ -328,7 +473,24 @@ def main() -> int:
     sv = sub.add_parser("serve"); sv.add_argument("--artifacts", default="../artifacts")
     sv.add_argument("--simulate-present", action="store_true")
     sv.add_argument("--max-ticks", type=int, default=None); sv.set_defaults(fn=cmd_serve)
-    args = ap.parse_args()
+    lc = sub.add_parser("llm-check", help="one real call through the configured language-model provider")
+    lc.set_defaults(fn=cmd_llm_check)
+    es = sub.add_parser("export-seed", help="dump the built demo database to a seed file (data only, no secrets)")
+    es.add_argument("--out", default="seed.dump"); es.add_argument("--artifacts", default="../artifacts")
+    es.set_defaults(fn=cmd_export_seed)
+    ls = sub.add_parser("load-seed", help="load a demo seed into a migrated database (minutes, instead of building for 10-46)")
+    src = ls.add_mutually_exclusive_group(required=True)
+    src.add_argument("--file", default=None, help="a seed file; its manifest is <file>.json")
+    src.add_argument("--url", default=None, help="download the seed from this URL (its manifest is <url>.json)")
+    ls.add_argument("--artifacts", default="../artifacts", help="where to put the promoted model that travels with the seed")
+    ls.add_argument("--overwrite", action="store_true", help="replace data already in the database (this is the reset)")
+    ls.add_argument("--demo-password", default=None, help="password for every demo user (or PULSE_DEMO_PASSWORD; else one is generated)")
+    ls.set_defaults(fn=cmd_load_seed)
+    return ap
+
+
+def main() -> int:
+    args = build_parser().parse_args()
     return args.fn(args)
 
 

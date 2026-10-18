@@ -1,5 +1,5 @@
 # Backend image: the API, the unattended worker and the CLI share it and differ only in the command.
-# UNVERIFIED: this file has not been built -- Docker is not installed on the machine it was written on.
+# Built and run on Apple silicon / Colima (linux/arm64) -- see README for exactly what that covered.
 # syntax=docker/dockerfile:1
 
 FROM python:3.13-slim AS build
@@ -11,6 +11,9 @@ RUN pip install --no-cache-dir --prefix=/install ".[llm]"
 
 FROM python:3.13-slim
 RUN useradd --create-home --uid 10001 pulse
+# pg_dump / pg_restore for the demo seed (`pulse export-seed` / `load-seed`). Debian's client is newer than the server,
+# which is fine: a newer pg_restore reads older dumps and talks to an older server.
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/backend
 COPY --from=build /install /usr/local
 COPY backend/alembic.ini ./
