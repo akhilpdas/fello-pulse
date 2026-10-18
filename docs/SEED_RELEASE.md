@@ -43,6 +43,8 @@ Then create a GitHub Release and attach the three files (web upload, or `gh rele
 
 > Seed of the demo database built on YYYY-MM-DD from schema revision `<revision>`. N drafts were written by `<model>` on `<date>`
 > and M are templates (the model-written drafts come from one real cycle and are not reproducible bit for bit).
+>
+> Current `seed-v1` (rebuilt 2026-10-18): 91 drafts by `qwen/qwen3.8-27b` on Groq's free tier, 15 templates. Its assets were replaced in place so the URL did not change; the sha256 in the release notes is the current one.
 > sha256 of `seed.dump`: `<sha256>`.
 
 A seed only loads into a database at the **same schema revision**; rebuild and re-publish it whenever a migration lands.

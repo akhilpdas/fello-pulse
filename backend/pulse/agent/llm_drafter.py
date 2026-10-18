@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import json
 import re
+import time
+import urllib.error
 import urllib.request
 from typing import Protocol
 
@@ -134,6 +136,18 @@ class AnthropicClient:
         return "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
 
 
+_RATE_LIMIT_RETRIES = 3
+_RETRY_AFTER_CAP_SECONDS = 30.0
+
+
+def _retry_after(exc) -> float:
+    """Seconds the provider asked us to wait (``Retry-After``), bounded so a cycle never stalls on one call."""
+    try:
+        return min(max(float(exc.headers.get("Retry-After", "")), 0.0), _RETRY_AFTER_CAP_SECONDS)
+    except (TypeError, ValueError):
+        return 2.0
+
+
 class OpenAICompatibleClient:
     """Any server that speaks the OpenAI-style ``/chat/completions`` protocol: Ollama and LM Studio (local, free, no key),
     or a hosted provider with a free tier (Groq, OpenRouter, Google's Gemini endpoint). Standard library only -- no SDK,
@@ -157,8 +171,15 @@ class OpenAICompatibleClient:
         if self._key:
             headers["Authorization"] = f"Bearer {self._key}"
         req = urllib.request.Request(self._url, data=body, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - scheme checked in __init__
-            data = json.load(resp)
+        for attempt in range(_RATE_LIMIT_RETRIES + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - scheme checked in __init__
+                    data = json.load(resp)
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code != 429 or attempt == _RATE_LIMIT_RETRIES:
+                    raise
+                time.sleep(_retry_after(exc))      # a free tier's per-minute token cap: wait as told, then try again
         return data["choices"][0]["message"]["content"] or ""
 
 

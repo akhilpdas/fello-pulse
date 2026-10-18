@@ -23,9 +23,10 @@ from pulse.agent.llm_drafter import LlmDrafter, LlmUnavailable, OpenAICompatible
 class _Server:
     """A real local HTTP server (so a real request goes over a real socket) that records what it was sent."""
 
-    def __init__(self, status=200, body=None, delay=0.0):
+    def __init__(self, status=200, body=None, delay=0.0, script=None):
         outer = self
         self.requests, self.status, self.body, self.delay = [], status, body, delay
+        self.script = list(script or [])     # statuses to answer first, in order (each may carry a Retry-After)
 
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self):  # noqa: N802
@@ -34,7 +35,10 @@ class _Server:
                 time.sleep(outer.delay)
                 payload = json.dumps(outer.body if outer.body is not None else
                                      {"choices": [{"message": {"content": "hello from the model"}}]}).encode()
-                self.send_response(outer.status)
+                status, retry_after = (outer.script.pop(0) if outer.script else (outer.status, None))
+                self.send_response(status)
+                if retry_after is not None:
+                    self.send_header("Retry-After", str(retry_after))
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
@@ -150,3 +154,25 @@ def test_identifies_itself_instead_of_sending_pythons_default_user_agent(server)
     OpenAICompatibleClient(s.url, api_key="k").complete("s", "u", model="m", max_tokens=5, timeout=5)
     agent = s.requests[0]["headers"]["User-Agent"]
     assert agent.startswith("fello-pulse/") and "urllib" not in agent.lower()
+
+
+def test_a_rate_limited_call_waits_as_told_and_retries_instead_of_failing_the_draft(server):
+    # Groq's free tier allows 8,000 tokens a minute; a batch of drafts meets 429 and a Retry-After. Without a retry the
+    # breaker opens after three and every later draft falls back to the template.
+    s = server(script=[(429, 0)])
+    out = OpenAICompatibleClient(s.url, api_key="k").complete("s", "u", model="m", max_tokens=5, timeout=5)
+    assert out == "hello from the model" and len(s.requests) == 2
+
+
+def test_a_provider_that_keeps_saying_429_is_given_up_on_after_a_few_tries(server):
+    s = server(script=[(429, 0)] * 10)
+    with pytest.raises(Exception, match="429"):
+        OpenAICompatibleClient(s.url, api_key="k").complete("s", "u", model="m", max_tokens=5, timeout=5)
+    assert len(s.requests) == 4          # the first try and three retries
+
+
+def test_other_errors_are_not_retried(server):
+    s = server(script=[(500, None)] * 5)
+    with pytest.raises(Exception, match="500"):
+        OpenAICompatibleClient(s.url, api_key="k").complete("s", "u", model="m", max_tokens=5, timeout=5)
+    assert len(s.requests) == 1
