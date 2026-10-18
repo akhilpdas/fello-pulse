@@ -1,0 +1,29 @@
+# Render Blueprint for the hosted demo (spec 003). UNVERIFIED against Render itself: written from Render's documentation
+# (render.com/docs/blueprint-spec) and not yet deployed -- docs/HOSTING.md says what has and has not been exercised.
+# Run `bash infra/render/probe.sh "<the database's external URL>"` once the database exists: it tells you whether this
+# database can run Pulse before you deploy anything.
+databases:
+  - name: pulse-db
+    plan: free              # 1 GB, expires 30 days after creation (14-day grace); fits the 564 MB demo
+    databaseName: pulse
+    user: pulse
+
+services:
+  - type: web
+    name: pulse
+    runtime: docker
+    plan: free              # 512 MB RAM (the app uses ~240 MB), sleeps after 15 idle minutes, ~1 minute to wake
+    dockerfilePath: ./infra/docker/hosted.Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/openapi.json
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pulse-db
+          property: connectionString
+      - key: PULSE_COOKIE_SECURE      # Render serves HTTPS
+        value: "true"
+      - key: PULSE_DEMO_PASSWORD      # set in the dashboard: at least 12 characters; give it to the reviewer in your message
+        sync: false
+      - key: PULSE_SEED_URL           # set in the dashboard: the https URL of seed.dump on the GitHub Release (docs/SEED_RELEASE.md)
+        sync: false

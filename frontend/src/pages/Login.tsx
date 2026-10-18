@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { friendlyError } from "../lib/coldStart";
 import { useSession } from "../lib/session";
 
 export function LoginPage() {
@@ -13,7 +14,7 @@ export function LoginPage() {
     e.preventDefault();
     setErr(null); setBusy(true);
     try { await signIn(workspace.trim(), email.trim(), password); }
-    catch (ex) { setErr((ex as Error).message); }
+    catch (ex) { setErr(friendlyError(ex)); }
     finally { setBusy(false); }
   }
   return (
