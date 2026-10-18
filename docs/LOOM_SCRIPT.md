@@ -86,7 +86,7 @@ Point at the three boxes, then say the logins line above. Sign in as `csm00@nort
 - Use the **Show** dropdown: `drafted`, `sent`, `rejected`, `opted_out`, `outbound_disabled`… "Every state has an explicit name, so you can see why a message did *not* go out."
 
 **2:45 Edit and approve (60 s).** On a non-top draft: change a word in **Body**, click **Save edit** (the edit is stored), then **Approve & send**.
-- A notice appears: **demo mode — captured, no customer was emailed.** "Outbound is off by default. Real sending needs a verified sender address *and* demo mode switched off. Nothing here can reach a real person: all addresses are `@example.com`."
+- On the hosted demo outbound is off, so the notice reads **"Not sent: outbound email is switched off for this workspace."** (with outbound on in demo mode it reads "captured but not delivered — no customer was emailed"). "Outbound is off by default. Real sending needs a verified sender address *and* demo mode switched off. Nothing here can reach a real person: all addresses are `@example.com`."
 - **Reject** is the other button.
 
 **3:45 A different login: the CSM (45 s).** Click **Sign out**. Sign in as `csm01@northwind.example.com`.
@@ -112,7 +112,7 @@ Optional (20 s): sign in to workspace `initech` as `csm00@initech.example.com` �
 - Open **declined decisions**. "The agent records what it chose *not* to do, with a reason — for example `no_eligible_play`. Read out one or two entries you actually see on screen. A system that acts on its own must be able to explain its restraint."
 - "There is also an unattended worker that cycles each tenant on a schedule. On Render's free tier there is no background worker, so the hosted demo shows the cycles that already ran; locally the worker runs on its own."
 
-**2:15 Model quality, said plainly (75 s).** Open `/api/model` in a new tab (signed in as the operator) — the model report; or just say it.
+**2:15 Model quality, said plainly (75 s).** The hosted demo has no promoted model (`/api/model` answers "no promoted model" because the hosted copy never trains), so don't open it: show the README "Results" section on GitHub or the deck slide, or just say the numbers.
 - "On a rolling backtest, ROC-AUC averages **0.661**. An oracle that is handed every account's hidden health gets **0.673**. So about 0.7 is the ceiling on this data — we are close to it."
 - "Lead time: at the amber line it flags **32%** of the losses, a median **72 days** ahead. The rest were not foreseeable from these signals."
 - "A small new tenant gets almost nothing from the shared model — I say so rather than hide it. The two planted 'lost renewal' accounts are *not* flagged out of sample, and I wrote down why instead of tuning to hit them (clarification B-33)."
