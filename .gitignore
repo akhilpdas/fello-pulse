@@ -16,3 +16,7 @@ pulse-sync.bundle
 .demo-credentials*
 frontend/test-results/
 frontend/playwright-report/
+
+# local configuration that may hold keys; .env.example is the committed template
+.env
+!.env.example

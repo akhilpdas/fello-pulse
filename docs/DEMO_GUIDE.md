@@ -101,6 +101,7 @@ Every demo user in a database shares one password. **It is never in git.** Where
   - **Free and local (verified):** install Ollama (`brew install ollama`, `ollama pull qwen2.5:7b`), then
     `PULSE_LLM_ENABLED=true PULSE_LLM_PROVIDER=openai_compatible PULSE_LLM_BASE_URL=http://127.0.0.1:11434/v1 PULSE_LLM_MODEL=qwen2.5:7b` and run a cycle (`python3 -m pulse.cli cycle`, or the worker). Drafts then show `draft_source: llm` and the model name.
     Any other OpenAI-style endpoint (LM Studio, Groq, OpenRouter, Gemini's compatible endpoint) works the same way with `PULSE_LLM_API_KEY`.
+  - **In Docker:** the same settings are passed through `docker-compose.yml`; copy `.env.example` to `.env` and uncomment one block (templates only, free local Ollama, free hosted Groq, or Anthropic). Ollama must be started with `OLLAMA_HOST=0.0.0.0` so a container can reach it at `host.docker.internal:11434` (verified from a container).
   - **Anthropic Claude (later, if wanted):** `PULSE_LLM_PROVIDER=anthropic PULSE_LLM_API_KEY=<key>` (default model `claude-sonnet-5-5`; `pip install -e ".[llm]"`). Not yet run against the real API.
 - **Guardrails:** the model sees only derived facts (never ticket or email text); its reply is rejected — and the template used instead — if it contains any number, link, markup or
   claim that is not traceable to those facts; calls are capped per cycle and a failing provider trips a breaker.

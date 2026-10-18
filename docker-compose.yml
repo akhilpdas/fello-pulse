@@ -33,7 +33,11 @@ services:
       PULSE_SMTP_PORT: ${PULSE_SMTP_PORT:-587}
       PULSE_SMTP_USER: ${PULSE_SMTP_USER:-}
       PULSE_SMTP_PASSWORD: ${PULSE_SMTP_PASSWORD:-}
+      # Drafting prose: off by default (templates). See .env.example for the free-model and Anthropic options.
       PULSE_LLM_ENABLED: ${PULSE_LLM_ENABLED:-false}
+      PULSE_LLM_PROVIDER: ${PULSE_LLM_PROVIDER:-anthropic}
+      PULSE_LLM_BASE_URL: ${PULSE_LLM_BASE_URL:-}
+      PULSE_LLM_MODEL: ${PULSE_LLM_MODEL:-claude-sonnet-5-5}
       PULSE_LLM_API_KEY: ${PULSE_LLM_API_KEY:-}
     volumes:
       - feeds:/app/data
