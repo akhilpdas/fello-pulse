@@ -76,3 +76,19 @@ def test_a_csm_sees_counts_for_their_own_accounts_only():
         s.execute(text("UPDATE account SET owner_user_id = :o WHERE id = :a"), {"o": csm, "a": one})
     body = TestClient(app).get("/queue/snapshots", headers=auth_headers(tenant_id, csm, role="csm")).json()
     assert [r["scored"] for r in body["snapshots"]] == [1]
+
+
+def test_several_cycles_on_one_day_are_one_entry_the_latest_of_that_day():
+    # The worker cycles every 15 minutes, so a day holds many snapshots; a picker listing each would be a wall of
+    # near-identical dates. One entry per day, and it is the day's last snapshot (what the queue ended the day as).
+    tenant_id, cfg = seed_tenant(NOW)
+    with owner_session() as s:
+        a = seed_account(s, tenant_id, NOW, "daily", n_tickets=8)
+    model = toy_support_model(3)
+    times = [NOW.replace(hour=6), NOW.replace(hour=9), NOW.replace(hour=15), NOW - timedelta(days=7)]
+    with tenant_session(tenant_id) as s:
+        for t in times:
+            score_and_persist(s, tenant_id=tenant_id, account_id=a, model=model, model_version="t",
+                              tenant_config=cfg, as_of=t)
+    body = TestClient(app).get("/queue/snapshots", headers=auth_headers(tenant_id)).json()
+    assert [datetime.fromisoformat(r["as_of"]) for r in body["snapshots"]] == [NOW.replace(hour=15), NOW - timedelta(days=7)]

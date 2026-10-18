@@ -1,4 +1,4 @@
-# One command: docker compose up --build        (UNVERIFIED -- see README: Docker is not installed on the dev machine)
+# One command: docker compose up --build        (built and run on Apple-silicon/Colima, linux/arm64 -- see README for what that covered)
 # Then, once:  docker compose run --rm api python3 -m pulse.cli bootstrap-demo
 # Open http://localhost:5173 and sign in (the command prints the workspace, email and password).
 #

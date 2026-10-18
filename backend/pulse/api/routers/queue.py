@@ -31,7 +31,7 @@ _QUEUE_SQL = """
         FROM score s
         WHERE s.tenant_id = :tenant_id
     )
-    SELECT scored.*, a.name AS account_name
+    SELECT scored.*, a.name AS account_name, a.external_ref
     FROM scored
     JOIN account a ON a.id = scored.account_id
     WHERE scored.as_of = :as_of
@@ -70,6 +70,7 @@ def _row(r) -> dict:
     return {
         "account_id": str(r["account_id"]),
         "account_name": r["account_name"],
+        "external_ref": r["external_ref"],
         "tier": r["tier"],
         "health_score": r["health_score"],
         "probability": float(r["probability"]),
@@ -105,11 +106,14 @@ def get_queue_snapshots(
     session: Session = Depends(get_session),
     principal: Principal = Depends(get_principal),
 ):
-    """The dates a queue exists for, newest first, with how many of the caller's accounts were scored on each."""
+    """The days a queue exists for, newest first, with how many of the caller's accounts were scored. The worker cycles
+    every 15 minutes, so a day holds many snapshots; one entry per (UTC) day -- the day's last -- keeps the picker usable."""
     visible, vparams = visible_clause(principal)
     rows = session.execute(
-        text("SELECT s.as_of, count(*) AS scored FROM score s JOIN account a ON a.id = s.account_id"
-             f" WHERE {visible} GROUP BY s.as_of ORDER BY s.as_of DESC"),
+        text("SELECT DISTINCT ON ((as_of AT TIME ZONE 'UTC')::date) as_of, scored FROM ("
+             "  SELECT s.as_of, count(*) AS scored FROM score s JOIN account a ON a.id = s.account_id"
+             f"  WHERE {visible} GROUP BY s.as_of) per_snapshot"
+             " ORDER BY (as_of AT TIME ZONE 'UTC')::date DESC, as_of DESC"),
         vparams,
     ).all()
     return {"snapshots": [{"as_of": r[0].isoformat(), "scored": r[1]} for r in rows]}

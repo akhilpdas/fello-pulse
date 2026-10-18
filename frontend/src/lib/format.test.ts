@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { driverLabel, formatDelta, formatMoney, formatPercent, renewalLabel, tierRank } from "./format";
+import { driverLabel, formatDelta, formatFeatureValue, formatMoney, formatPercent, renewalLabel, tierRank } from "./format";
 
 describe("formatMoney", () => {
   it("renders cents as whole dollars with grouping", () => {
@@ -43,5 +43,22 @@ describe("tierRank", () => {
   it("orders red before amber before green, with abstain last", () => {
     const tiers = ["green", "abstain", "red", "amber"].sort((a, b) => tierRank(a) - tierRank(b));
     expect(tiers).toEqual(["red", "amber", "green", "abstain"]);
+  });
+});
+
+describe("formatFeatureValue", () => {
+  it("shows a missing value as a dash, never as zero", () => {
+    expect(formatFeatureValue(null)).toBe("—");
+    expect(formatFeatureValue(undefined)).toBe("—");
+  });
+  it("keeps whole numbers whole", () => {
+    expect(formatFeatureValue(84223342)).toBe("84223342");
+    expect(formatFeatureValue(2)).toBe("2");
+    expect(formatFeatureValue(0)).toBe("0");
+  });
+  it("trims long fractions to three significant digits", () => {
+    expect(formatFeatureValue(0.05083260297984225)).toBe("0.0508");
+    expect(formatFeatureValue(3.8683333333333333)).toBe("3.87");
+    expect(formatFeatureValue(0.5918367346938777)).toBe("0.592");
   });
 });

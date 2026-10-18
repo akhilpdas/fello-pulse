@@ -2,7 +2,7 @@
 // schema.d.ts types paths and request bodies but not these; they mirror the
 // routers in backend/pulse/api/routers and are checked against live data.
 export interface QueueRow {
-  account_id: string; account_name: string; tier: string; health_score: number | null;
+  account_id: string; account_name: string; external_ref: string; tier: string; health_score: number | null;
   probability: number; value_at_risk_cents: number | null; dominant_driver: string | null;
   days_to_renewal: number | null; priority: number; confidence: string;
   abstain_reason: string | null; delta: number | null;

@@ -31,3 +31,10 @@ export function tierRank(tier: string): number {
   const i = TIER_ORDER.indexOf(tier);
   return i === -1 ? TIER_ORDER.length : i;
 }
+
+/** A feature value for display: a dash when missing, whole numbers untouched, long fractions cut to three significant digits. */
+export function formatFeatureValue(v: unknown): string {
+  if (v == null) return "—";
+  if (typeof v === "number") return Number.isInteger(v) ? String(v) : String(Number(v.toPrecision(3)));
+  return String(v);
+}

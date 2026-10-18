@@ -81,7 +81,8 @@ export interface paths {
         };
         /**
          * Get Queue Snapshots
-         * @description The dates a queue exists for, newest first, with how many of the caller's accounts were scored on each.
+         * @description The days a queue exists for, newest first, with how many of the caller's accounts were scored. The worker cycles
+         *     every 15 minutes, so a day holds many snapshots; one entry per (UTC) day -- the day's last -- keeps the picker usable.
          */
         get: operations["get_queue_snapshots_queue_snapshots_get"];
         put?: never;

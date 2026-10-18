@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useSession } from "../lib/session";
 import type { ScoreDiff as Diff, Snapshots } from "../api/types";
 import { snapshotLabel } from "../lib/browse";
-import { formatDelta, formatPercent } from "../lib/format";
+import { formatDelta, formatFeatureValue, formatPercent } from "../lib/format";
 import { useApi } from "../lib/useApi";
 
 export function ScoreDiffView({ accountId, currentAsOf }: { accountId: string; currentAsOf: string }) {
@@ -44,7 +44,7 @@ export function ScoreDiffView({ accountId, currentAsOf }: { accountId: string; c
             <tbody>
               {diff.feature_diffs.slice(0, 10).map((d) => (
                 <tr key={d.feature}>
-                  <td>{d.feature}</td><td>{d.from_value ?? "—"}</td><td>{d.to_value ?? "—"}</td>
+                  <td>{d.feature}</td><td>{formatFeatureValue(d.from_value)}</td><td>{formatFeatureValue(d.to_value)}</td>
                   <td>{d.contribution_delta >= 0 ? "+" : ""}{d.contribution_delta.toFixed(3)}</td>
                 </tr>
               ))}

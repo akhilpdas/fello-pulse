@@ -25,7 +25,7 @@ export function QueuePage() {
               {data.rows.map((r, i) => (
                 <tr key={r.account_id}>
                   <td>{i + 1}</td>
-                  <td><Link to={`/accounts/${r.account_id}`}>{r.account_name}</Link></td>
+                  <td><Link to={`/accounts/${r.account_id}`}>{r.account_name}</Link> <span className="muted ref">{r.external_ref}</span></td>
                   <td><TierBadge tier={r.tier} /></td>
                   <td>{formatPercent(r.probability)}</td>
                   <td>{formatMoney(r.value_at_risk_cents)}</td>

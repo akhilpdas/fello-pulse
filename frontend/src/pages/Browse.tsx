@@ -65,7 +65,7 @@ export function BrowsePage() {
               {data.rows.map((r) => (
                 <tr key={r.account_id} className={r.in_queue ? "in-queue" : undefined}>
                   <td>{r.rank}</td>
-                  <td><Link to={`/accounts/${r.account_id}`}>{r.account_name}</Link></td>
+                  <td><Link to={`/accounts/${r.account_id}`}>{r.account_name}</Link> <span className="muted ref">{r.external_ref}</span></td>
                   <td><TierBadge tier={r.tier} /></td>
                   <td>{formatPercent(r.probability)}</td>
                   <td>{formatMoney(r.value_at_risk_cents)}</td>

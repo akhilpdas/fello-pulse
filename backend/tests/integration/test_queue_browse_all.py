@@ -145,3 +145,12 @@ def test_accounts_with_equal_priority_keep_a_stable_order_so_paging_cannot_skip_
     rows = TestClient(app).get("/queue/all", headers=auth_headers(tenant_id)).json()["rows"]
     assert len({r["priority"] for r in rows}) == 1  # the premise: they really are tied
     assert [r["account_id"] for r in rows] == sorted(r["account_id"] for r in rows)
+
+
+def test_rows_carry_the_external_ref_so_same_named_accounts_can_be_told_apart(world):
+    # Account names are not unique inside a tenant (clarifications / README gap); the CRM reference is.
+    c = TestClient(app)
+    refs = {r["account_name"]: r["external_ref"] for r in _all(world)["rows"]}
+    assert refs == {n.title(): n for n in TICKETS}
+    head = c.get("/queue", headers=world["headers"]).json()["rows"]
+    assert all(r["external_ref"] == r["account_name"].lower() for r in head)
