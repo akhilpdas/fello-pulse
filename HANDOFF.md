@@ -728,3 +728,13 @@ Run through the spec-kit flow: `specs/003-hosted-demo/` (spec, plan, 32 tasks), 
 - **Deck** (12 slides) and **Loom script** updated for the seed path. **Still open:** Groq (needs the owner's free key in `.env`), Render probe (needs a free Render Postgres URL in `.env`), hosted deploy, re-export of the seed with Groq-written drafts, final deck/Loom/email once the hosted URL and Groq facts exist.
 
 - **Repository is now PUBLIC** (owner ran the command). Verified anonymously: `git clone`, and all three seed assets download with the right sha256. **End-to-end reviewer path from public GitHub, empty cache, `load-seed --url`: 73 s build + 244 s download/verify/load = 5 min 17 s** (download-bound on this connection; the load itself is ~14 s); under the 10-minute target. `.env` created (git-ignored, mode 600) with two `FILL_ME` values: the Groq key and the Render database URL.
+
+
+---
+
+## Render first deploy: found a real privilege gap, fixed test-first (2026-10-18)
+
+- **What Render did:** the Blueprint created `pulse-db` and the `pulse` service; the service failed in `alembic upgrade head` at migration 0002: `permission denied to create role … Only roles with the BYPASSRLS attribute may create roles with the BYPASSRLS attribute` (the managed login has CREATEROLE but is not a superuser and has no BYPASSRLS).
+- **Fix (T023, test first, RED reproduced Render's exact error):** migrations 0002/0005 create `pulse_trainer` and grant to it only when the login may (superuser or BYPASSRLS), so the request role `pulse_app` is created as before (NOBYPASSRLS) and FORCE ROW LEVEL SECURITY is untouched; `pulse.seed.needs_rls_lift` / `rls_lifted` lift FORCE on the forced tables for the length of a seed load and restore it (committed both sides; ENABLE stays on, so `pulse_app` is never unprotected); `load_seed(lift_rls=)` wraps truncate, restore, password reset and count check, and restores even when the restore fails; a refused load lifts nothing. A superuser login (every local path) is unchanged.
+- **Tests:** `test_migration_roles_without_superuser.py` (3; starts its own throwaway Postgres because roles are cluster-wide), 3 new in `test_seed_load.py`. **Verified by hand:** the real 51 MB seed loaded on a CREATEROLE-only cluster (5,000 accounts, 36,953 scores), FORCE restored on 16/16 tables, sign-in and queue through `pulse_app`.
+- **Consequence to state:** on Render there is no `pulse_trainer`, so model training cannot run there (nothing hosted trains; the model ships in the seed).

@@ -73,6 +73,6 @@ def test_the_deck_carries_the_real_queue_rows(tmp_path, api):
     build_deck.build(build_deck.parse((Path(build_deck.__file__).parent / "DECK.md").read_text()), q, out)
     from pptx import Presentation
     slides = list(Presentation(out).slides)
-    assert len(slides) == 11
+    assert len(slides) == 12      # docs/DECK.md has 12 slides (the seed slide was added in spec 003)
     cells = [c.text for sl in slides for sh in sl.shapes if sh.has_table for r in sh.table.rows for c in r.cells]
     assert "Castlegate Estates" in cells and "$1,692,592" in cells

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import tarfile
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -90,8 +91,38 @@ def export_seed(*, dsn: str, out: Path, revision: str, row_counts: dict[str, int
     return manifest
 
 
+def needs_rls_lift(session) -> bool:
+    """True when this login is subject to FORCEd row-level security: neither a superuser nor BYPASSRLS (a managed
+    database's login). Such a login sees no tenant rows without a tenant claim, so a bulk load cannot count or fix up
+    what it restored."""
+    from sqlalchemy import text
+    return not session.execute(text("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user")).scalar()
+
+
+@contextmanager
+def rls_lifted(session):
+    """Switch FORCE ROW LEVEL SECURITY off on the tables that have it, for the length of the load, then switch it back.
+    An owner is exempt from row-level security that is not forced. ENABLE stays on throughout, so the request role
+    (``pulse_app``, NOBYPASSRLS) is never unprotected. Committed on both sides because the restore is another connection."""
+    from sqlalchemy import text
+    tables = [r[0] for r in session.execute(text(
+        "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relforcerowsecurity")).all()]
+    for t in tables:
+        session.execute(text(f'ALTER TABLE "{t}" NO FORCE ROW LEVEL SECURITY'))
+    session.commit()
+    try:
+        yield tables
+    finally:
+        session.rollback()
+        for t in tables:
+            session.execute(text(f'ALTER TABLE "{t}" FORCE ROW LEVEL SECURITY'))
+        session.commit()
+
+
 def load_seed(*, file: Path, manifest: Manifest, dsn: str, tenant_count: int, db_revision: str, overwrite: bool,
-              demo_password: str, restore, truncate, set_passwords, row_counts, artifacts_dest: Path | None = None) -> None:
+              demo_password: str, restore, truncate, set_passwords, row_counts, artifacts_dest: Path | None = None,
+              lift_rls=None) -> None:
     """Restore a seed into a migrated database. Order matters and every refusal happens before the first change:
     check -> (empty the old data if asked) -> restore -> set the password for the person loading -> verify the counts."""
     from pulse.auth.passwords import PasswordPolicyError, validate_password
@@ -105,12 +136,13 @@ def load_seed(*, file: Path, manifest: Manifest, dsn: str, tenant_count: int, db
     if manifest.artifacts_sha256 and artifacts_dest is not None:
         if not archive.exists() or sha256_of(archive) != manifest.artifacts_sha256:
             raise SeedError("the model archive is missing or does not match the manifest's sha256; download the seed again")
-    if tenant_count:
-        truncate()
-    restore(dsn, file)
-    # The seed carries the publisher's password hashes; nobody else knows that password. Replace every one.
-    set_passwords(demo_password)
-    got = row_counts()
+    with (lift_rls() if lift_rls else nullcontext()):        # a login that is subject to forced row-level security (Render)
+        if tenant_count:
+            truncate()
+        restore(dsn, file)
+        # The seed carries the publisher's password hashes; nobody else knows that password. Replace every one.
+        set_passwords(demo_password)
+        got = row_counts()
     wrong = {t: (n, got.get(t)) for t, n in manifest.row_counts.items() if got.get(t) != n}
     if wrong:
         detail = ", ".join(f"{t}: expected {a}, found {b}" for t, (a, b) in wrong.items())

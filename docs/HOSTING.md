@@ -72,7 +72,9 @@ route or button for this; it cannot be triggered from the web.
 | Empty database → migrate → download the seed over HTTPS → verify → load → serve in 17 s | **Exercised** (Docker, local; a throwaway certificate stood in for GitHub) |
 | App memory after the full browser suite: 237 MB | **Measured** |
 | The probe's verdicts | **Tested** locally against three kinds of user |
-| Render accepts `render.yaml`; the database user's privileges; free-tier cold start of ~1 minute | **Not exercised** |
+| Render accepts `render.yaml` (it created the database and the service) | **Exercised** (2026-10-18) |
+| The database user's privileges | **Exercised, and wrong**: Render's login can create roles but not `BYPASSRLS`; the first deploy failed in migration 0002. Fixed (T023) and verified on a throwaway cluster with that kind of login; the redeploy on Render is still to be observed |
+| Free-tier cold start of ~1 minute | **Not exercised** |
 | Railway deploy, cost and credit burn | **Not exercised** |
 | Reviewers using the URL at the same time | **Not exercised** |
 

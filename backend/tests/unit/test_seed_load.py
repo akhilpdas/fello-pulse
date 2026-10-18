@@ -114,3 +114,51 @@ def test_settings_a_newer_client_writes_but_an_older_server_rejects_are_dropped_
     script = [b"SET statement_timeout = 0;\n", b"SET transaction_timeout = 0;\n", b"COPY public.account (id) FROM stdin;\n",
               b"SET transaction_timeout in a data row\n"]
     assert list(strip_unsupported_settings(script)) == [script[0], script[2], script[3]]
+
+
+class Lift:
+    """A stand-in for ``rls_lifted`` that records when row-level security is off."""
+
+    def __init__(self, events):
+        self.events = events
+
+    def __call__(self):
+        return self
+
+    def __enter__(self):
+        self.events.append(("rls-lifted",))
+
+    def __exit__(self, *exc):
+        self.events.append(("rls-restored",))
+
+
+def test_row_level_security_is_lifted_around_the_whole_load_and_restored_after_the_counts(tmp_path):
+    f, m, p = _setup(tmp_path, {"account": 5, "score": 9}, tenants=3)
+    load_seed(file=f, manifest=m, dsn="postgresql://x/pulse", tenant_count=3, db_revision="0010", overwrite=True,
+              demo_password="a-long-demo-passphrase", restore=p.restore, truncate=p.truncate,
+              set_passwords=p.set_passwords, row_counts=lambda: (p.events.append(("counts",)) or p.counts),
+              lift_rls=Lift(p.events))
+    assert [e[0] for e in p.events] == ["rls-lifted", "truncate", "restore", "passwords", "counts", "rls-restored"]
+
+
+def test_row_level_security_is_restored_when_the_restore_fails(tmp_path):
+    f, m, p = _setup(tmp_path, {})
+
+    def boom(dsn, file):
+        p.events.append(("restore",))
+        raise SeedError("restore failed")
+
+    with pytest.raises(SeedError, match="restore failed"):
+        load_seed(file=f, manifest=m, dsn="postgresql://x/pulse", tenant_count=0, db_revision="0010", overwrite=False,
+                  demo_password="a-long-demo-passphrase", restore=boom, truncate=p.truncate,
+                  set_passwords=p.set_passwords, row_counts=p.row_counts, lift_rls=Lift(p.events))
+    assert [e[0] for e in p.events] == ["rls-lifted", "restore", "rls-restored"]
+
+
+def test_a_refused_load_does_not_lift_row_level_security(tmp_path):
+    f, m, p = _setup(tmp_path, {}, tenants=3)
+    with pytest.raises(SeedError, match="--overwrite"):
+        load_seed(file=f, manifest=m, dsn="postgresql://x/pulse", tenant_count=3, db_revision="0010", overwrite=False,
+                  demo_password="a-long-demo-passphrase", restore=p.restore, truncate=p.truncate,
+                  set_passwords=p.set_passwords, row_counts=p.row_counts, lift_rls=Lift(p.events))
+    assert p.events == []

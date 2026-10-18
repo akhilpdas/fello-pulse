@@ -41,6 +41,7 @@ greppable at review time.
 
 from __future__ import annotations
 
+import sqlalchemy as sa
 from alembic import op
 
 revision = "0002_rls"
@@ -59,6 +60,12 @@ GLOBAL_TABLES = ["tenant", "model_version", "work_lease"]
 CLAIM = "NULLIF(current_setting('pulse.tenant_id', true), '')::uuid"
 
 
+def _grantees() -> str:
+    """``pulse_app`` always; ``pulse_trainer`` only where it exists (see the role step below)."""
+    trainer = op.get_bind().execute(sa.text("SELECT 1 FROM pg_roles WHERE rolname = 'pulse_trainer'")).scalar()
+    return "pulse_app, pulse_trainer" if trainer else "pulse_app"
+
+
 def upgrade() -> None:
     op.execute(
         """
@@ -68,7 +75,10 @@ def upgrade() -> None:
             CREATE ROLE pulse_app LOGIN PASSWORD 'pulse_app'
               NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
           END IF;
-          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pulse_trainer') THEN
+          -- BYPASSRLS can only be granted by a role that has it. A managed database's login (Render) does not, so
+          -- there the trainer role is skipped: it is used by cross-tenant model training, which a hosted demo never runs.
+          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pulse_trainer')
+             AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = current_user AND (rolsuper OR rolbypassrls)) THEN
             CREATE ROLE pulse_trainer LOGIN PASSWORD 'pulse_trainer'
               NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
           END IF;
@@ -76,15 +86,16 @@ def upgrade() -> None:
         $$;
         """
     )
-    op.execute("GRANT USAGE ON SCHEMA public TO pulse_app, pulse_trainer")
+    grantees = _grantees()
+    op.execute(f"GRANT USAGE ON SCHEMA public TO {grantees}")
 
     for table in TENANT_SCOPED_TABLES + GLOBAL_TABLES:
         op.execute(
-            f"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE {table} TO pulse_app, pulse_trainer"
+            f"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE {table} TO {grantees}"
         )
 
     op.execute(
-        "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO pulse_app, pulse_trainer"
+        f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {grantees}"
     )
 
     for table in TENANT_SCOPED_TABLES:

@@ -89,10 +89,12 @@ def upgrade() -> None:
     )
 
     # --- privileges and row-level security -------------------------------- #
-    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE app_session, contact_opt_out TO pulse_app, pulse_trainer")
+    trainer = op.get_bind().execute(sa.text("SELECT 1 FROM pg_roles WHERE rolname = 'pulse_trainer'")).scalar()   # absent on a managed database (0002)
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE app_session, contact_opt_out TO pulse_app" + (", pulse_trainer" if trainer else ""))
     # Append-only: the application can write and read the audit trail, never rewrite it.
     op.execute("GRANT SELECT, INSERT ON TABLE audit_event TO pulse_app")
-    op.execute("GRANT SELECT ON TABLE audit_event TO pulse_trainer")
+    if trainer:
+        op.execute("GRANT SELECT ON TABLE audit_event TO pulse_trainer")
 
     for table in NEW_TABLES:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")

@@ -329,7 +329,7 @@ def cmd_load_seed(args) -> int:
     import urllib.request
 
     from pulse.auth.passwords import hash_password
-    from pulse.seed import Manifest, SeedError, load_seed, restore_stream
+    from pulse.seed import Manifest, SeedError, load_seed, needs_rls_lift, restore_stream, rls_lifted
 
     workdir = Path(tempfile.mkdtemp(prefix="seed-"))
     if args.url:
@@ -377,7 +377,8 @@ def cmd_load_seed(args) -> int:
         try:
             load_seed(file=file, manifest=manifest, dsn=_libpq_dsn(), tenant_count=tenants, db_revision=revision,
                       overwrite=args.overwrite, demo_password=password, restore=restore_stream, truncate=truncate,
-                      set_passwords=set_passwords, row_counts=counts, artifacts_dest=Path(args.artifacts))
+                      set_passwords=set_passwords, row_counts=counts, artifacts_dest=Path(args.artifacts),
+                      lift_rls=(lambda: rls_lifted(session)) if needs_rls_lift(session) else None)
         except SeedError as exc:
             print(f"not loaded: {exc}")
             return 1
