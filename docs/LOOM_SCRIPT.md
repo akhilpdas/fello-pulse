@@ -3,8 +3,9 @@
 **0:00 — Framing (30s).** "The request was a dashboard and an auto-email. The evidence was a lead-time problem.
 So this ranks, explains, and drafts — and a human sends."
 
-**0:30 — One command (30s).** Terminal: `bash infra/scripts/run_all.sh` (show the end: the sign-in details).
-Say it went from an empty database to scored, and that it is idempotent.
+**0:30 — Running it (30s).** Terminal: `docker compose up -d --build db api web`, then `docker compose run --rm api python3 -m pulse.cli load-seed --url <the seed's release URL>` — show it finish in about 15 seconds and print the sign-in.
+Say: a clean-clone dry run measured the old path at 7 min 37 s to build plus 10 to 46 minutes for the history, so a reviewer now loads a pre-built, checksummed seed instead (the from-scratch build is still documented and works).
+If a hosted link exists, say it is a free-tier service that sleeps when idle, so the first load can take about a minute.
 
 **1:00 — Monday queue (75s).** UI → sign in as the Northwind operator → Queue. Point at: bounded list, "why" column, value at risk, renewal distance, delta since last cycle, the small grey CRM reference
 under each name (names repeat inside a tenant), "N more below the cut". Open the **Week** picker and move to an earlier week; click **Browse all accounts →**, search a name, filter by tier.

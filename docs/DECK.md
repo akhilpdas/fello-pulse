@@ -24,8 +24,11 @@ Point-in-time · model ranks/LLM writes (only from derived facts; output rejecte
 ## 8. Does the model earn its place?
 Rolling backtest (4 folds, last 52 weeks, each fold scored by a model that saw only what was known then): ROC-AUC 0.661, against 0.673 for an oracle that knows every account's hidden health — on this data 0.7 is close to the ceiling. Lead time over all 390 losses: at the amber line (≥10% risk, 4.6% of account-weeks) 32% flagged, median 72 days ahead; oracle 33%. Precision@100 about 0.5 vs 0.02 for the heuristic on the latest block (one draw). Promotion is gated on beating the baseline at the operating point.
 
-## 9. What we are honest about
+## 9. Try it in minutes
+A reviewer-style dry run from a clean clone measured the old path: 7 min 37 s to build, then 10 to 46 minutes of backfill before the demo had any history. Now `docker compose up` plus `load-seed` loads a checksummed 51 MB seed in 15 s, history included; 13 of 13 browser scenarios pass against it. A single-service image (237 MB RAM, empty database to serving in 17 s) and a free-tier blueprint are prepared and tested in Docker; deployment status and the link are in the submission email.
+
+## 10. What we are honest about
 The two planted lost-renewal accounts are not flagged out of sample, and they are poor tests (one is forced to churn by a rule no health signal shows; the other churned a year before its planted collapse) — so lead time is measured over every loss instead (B-33). About 70% of losses are not foreseeable from these signals. A new small tenant gets almost nothing from the shared model (cold-start AUC 0.46). Email was verified over real SMTP against a local mail server, including an unattended send, but no real mail provider has been used. Drafting ran for real against a free local model (20 of 20 drafts passed the guardrails); the Anthropic provider has not been run against the real API. Containers built and run on arm64 only (browser suite passes against them). Earlier-week scores are in-sample, for browsing only.
 
-## 10. 10× and what's next
+## 11. 10× and what's next
 Cycle is first to break (batched loading, more workers). Next: uplift once intervention history exists. More features would not help here — the existing ones already reconstruct the hidden health (R² 0.78) and adding the true health gained nothing.
