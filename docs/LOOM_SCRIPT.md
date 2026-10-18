@@ -3,7 +3,7 @@
 **0:00 — Framing (30s).** "The request was a dashboard and an auto-email. The evidence was a lead-time problem.
 So this ranks, explains, and drafts — and a human sends."
 
-**0:30 — Running it (30s).** Terminal: `docker compose up -d --build db api web`, then `docker compose run --rm api python3 -m pulse.cli load-seed --url <the seed's release URL>` — show it finish in about 15 seconds and print the sign-in.
+**0:30 — Running it (30s).** Terminal: `docker compose up -d --build db api web`, then `docker compose run --rm api python3 -m pulse.cli load-seed --url https://github.com/akhilpdas/fello-pulse/releases/download/seed-v1/seed.dump` — show it finish in about 15 seconds and print the sign-in.
 Say: a clean-clone dry run measured the old path at 7 min 37 s to build plus 10 to 46 minutes for the history, so a reviewer now loads a pre-built, checksummed seed instead (the from-scratch build is still documented and works).
 If a hosted link exists, say it is a free-tier service that sleeps when idle, so the first load can take about a minute.
 

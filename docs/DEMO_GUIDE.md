@@ -42,7 +42,7 @@ docker compose run --rm api python3 -m pulse.cli bootstrap-demo   # builds the e
 
 ```bash
 docker compose up -d --build db api web
-docker compose run --rm api python3 -m pulse.cli load-seed --url <the seed's release URL>    # 15 s; prints the sign-in once
+docker compose run --rm api python3 -m pulse.cli load-seed --url https://github.com/akhilpdas/fello-pulse/releases/download/seed-v1/seed.dump    # 15 s; prints the sign-in once
 ```
 
 Only one of A/B/C can use port 5173 at a time (`docker compose down` to free it).

@@ -716,3 +716,13 @@ Run through the spec-kit flow: `specs/003-hosted-demo/` (spec, plan, 32 tasks), 
 - **Image size:** 882 MB → 966 MB (`postgresql-client` for `pg_dump`/`pg_restore`).
 - **Owner steps left (they need accounts or a key):** T014 publish the seed as a GitHub Release asset (`gh` is not installed; web upload works); T022 Render (probe first); T024 Railway if Render says NEEDS-CHANGES/NO-GO; T028 free Groq key → T029 one real cycle with `llm_calls_per_cycle` lowered → T030 re-export the seed so it holds model-written, labelled drafts; T015 stopwatch from a clean clone with the published seed.
 - **Written down as not done:** a hosted worker; custom request-role passwords (the migration's development defaults remain — restrict the database's network access); T023 (the no-superuser path) is conditional on the probe.
+
+
+---
+
+## Seed published, cold stopwatch, submission kit (2026-10-18, later)
+
+- **gh** installed and authenticated (`akhilpdas`). **Release `seed-v1`** created with the three seed files (template drafts, sha256 in the notes). **The repository is still PRIVATE**: making it public was blocked by the permission classifier (it is hard to undo, so it needs the owner's own command: `gh repo edit akhilpdas/fello-pulse --visibility public --accept-visibility-change-consequences`; revert with `--visibility private`). A pre-flight scan found no secrets in files or history; the history does carry the author email `agilpdas@gmail.com` (8 commits) and the laptop hostname (33). Until it is public, `load-seed --url` and the hosted service cannot download the seed anonymously.
+- **SC-001 stopwatch:** fresh clone, empty Docker image cache, Apple silicon, Colima 4 CPU / 8 GB: **76 s** cold build and start + **14 s** seed load = **90 s** to a signed-in demo (seed from a local file; the 51 MB download adds seconds, not yet measured). 13/13 browser scenarios pass against it. Compare: 7 min 37 s to build + 10-46 min of backfill.
+- **Submission kit (git-ignored, local):** `.submission-email.local.md` (draft with the workspaces, logins and password) and `.submission-attachments/Pulse_demo_credentials.txt`. Decision: the hosted URL and the credentials go only in the email, never in the repository or README.
+- **Deck** (12 slides) and **Loom script** updated for the seed path. **Still open:** Groq (needs the owner's free key in `.env`), Render probe (needs a free Render Postgres URL in `.env`), hosted deploy, re-export of the seed with Groq-written drafts, final deck/Loom/email once the hosted URL and Groq facts exist.

@@ -30,8 +30,8 @@ description: "Tasks: Hosted Demo and Reviewer Experience"
 - [X] T011 [US1] Test first (`backend/tests/unit/test_cli_seed.py`: arguments parse, `--overwrite` required wording) then wire `export-seed` and `load-seed` in `backend/pulse/cli.py`
 - [X] T012 [US1] Docker acceptance (done 2026-10-18: seed loads in **15 s**; 13/13 browser scenarios pass; old password rejected; worker starts with 'model ready'): export from the demo database; fresh stack; migrate; `load-seed`; compare queue top rows, `/queue/snapshots` (≥ 9 days) and row counts with the source; run the 13 browser scenarios against it; then `load-seed --overwrite` after a change and confirm the reset
 - [X] T013 [P] [US1] Write `docs/SEED_RELEASE.md` (how the seed is built, release-notes template with model/date/counts, how to attach it) and the quick path in `README.md` and `docs/DEMO_GUIDE.md` (Docker: `up` → `load-seed`; building from scratch stays documented)
-- [ ] T014 [US1] [OWNER] Publish the seed as a GitHub Release asset (web upload, or install `gh` and `gh auth login`); put its URL and sha256 in the README
-- [ ] T015 [US1] Stopwatch a clean clone following only the documented seed path; record the measured time and conditions in `HANDOFF.md` and `docs/DEMO_GUIDE.md` (SC-001)
+- [X] T014 [US1] [OWNER] Publish the seed as a GitHub Release asset — **done 2026-10-18: release `seed-v1` exists on the (still private) repository; it downloads anonymously only once the repository is public (waiting on the owner's go-ahead)**; URL in README/DEMO_GUIDE/SEED_RELEASE, sha256 in the release notes
+- [X] T015 [US1] Stopwatch (**measured 2026-10-18: fresh clone, empty Docker image cache, Apple silicon, Colima 4 CPU / 8 GB, seed loaded from a local file: 76 s cold build + start, 14 s load = 90 s to a signed-in demo; 13/13 browser scenarios pass.** The 51 MB download is not included — it needs the public repository) a clean clone following only the documented seed path; record the measured time and conditions in `HANDOFF.md` and `docs/DEMO_GUIDE.md` (SC-001)
 
 ## Phase 4: User Story 2 — free hosted URL (P1)
 

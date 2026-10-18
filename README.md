@@ -55,7 +55,7 @@ The five constitutional non-negotiables and the test that proves each:
 
 ```bash
 docker compose up -d --build db api web
-docker compose run --rm api python3 -m pulse.cli load-seed --url <the seed's release URL>   # fast path: about 15 s, with history (docs/SEED_RELEASE.md)
+docker compose run --rm api python3 -m pulse.cli load-seed --url https://github.com/akhilpdas/fello-pulse/releases/download/seed-v1/seed.dump   # fast path: about 15 s, with history (docs/SEED_RELEASE.md)
 # or build everything from scratch instead (about 8 minutes, then ~10-46 more for history):
 docker compose up --build
 docker compose run --rm api python3 -m pulse.cli bootstrap-demo     # builds the demo estate; prints the sign-in once

@@ -22,7 +22,7 @@ tenant has outbound email enabled: a seed can never ship in a sending state.
 
 ```bash
 docker compose up -d --build db api web          # the schema is created when the api starts
-docker compose run --rm api python3 -m pulse.cli load-seed --url <the release URL of seed.dump>
+docker compose run --rm api python3 -m pulse.cli load-seed --url https://github.com/akhilpdas/fello-pulse/releases/download/seed-v1/seed.dump
 # prints the sign-in once; open http://localhost:5173
 docker compose up -d worker                       # optional: the unattended agent
 ```
@@ -30,6 +30,8 @@ docker compose up -d worker                       # optional: the unattended age
 `--file /path/seed.dump` loads a file you already have (its manifest and model archive sit beside it). The load is one
 transaction: if anything fails, nothing is left half-loaded. It refuses a database that already holds tenants unless you pass
 `--overwrite`, which is also **the reset**: it empties the demo data and restores the seed. Measured: 15 seconds on a laptop.
+
+The published seed is release `seed-v1` of this repository: `https://github.com/akhilpdas/fello-pulse/releases/download/seed-v1/seed.dump` (the release notes carry its sha256). It downloads anonymously only while the repository is public.
 
 ## Build and publish one (the owner)
 
