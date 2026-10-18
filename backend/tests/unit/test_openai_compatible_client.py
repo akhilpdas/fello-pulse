@@ -141,3 +141,12 @@ def test_the_provider_is_not_loaded_unless_enabled():
 
     assert "llm_drafter" not in vars(cycle)  # still only ever imported lazily, inside the enabled branch
     assert hasattr(llm_drafter, "OpenAICompatibleClient")
+
+
+def test_identifies_itself_instead_of_sending_pythons_default_user_agent(server):
+    # Found live: Groq (behind Cloudflare) answers Python's default "Python-urllib/3.x" with HTTP 403, error code 1010,
+    # which reads exactly like a rejected key. Every real request must carry a User-Agent of its own.
+    s = server()
+    OpenAICompatibleClient(s.url, api_key="k").complete("s", "u", model="m", max_tokens=5, timeout=5)
+    agent = s.requests[0]["headers"]["User-Agent"]
+    assert agent.startswith("fello-pulse/") and "urllib" not in agent.lower()

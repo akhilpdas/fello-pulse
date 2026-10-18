@@ -153,7 +153,7 @@ class OpenAICompatibleClient:
             "model": model, "max_tokens": max_tokens, "temperature": 0.2,  # low: a small model then keeps to the format
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         }).encode()
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "User-Agent": "fello-pulse/1.0"}   # Cloudflare-fronted providers (Groq) refuse Python's default agent with a 403
         if self._key:
             headers["Authorization"] = f"Bearer {self._key}"
         req = urllib.request.Request(self._url, data=body, headers=headers, method="POST")

@@ -24,7 +24,7 @@ class _Provider:
         class H(BaseHTTPRequestHandler):
             def do_POST(self):  # noqa: N802
                 raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
-                outer.seen.append({"auth": self.headers.get("Authorization"), "json": json.loads(raw)})
+                outer.seen.append({"auth": self.headers.get("Authorization"), "agent": self.headers.get("User-Agent"), "json": json.loads(raw)})
                 time.sleep(delay)
                 payload = json.dumps(body if body is not None else {"choices": [{"message": {"content": "pong"}}]}).encode()
                 self.send_response(status)
@@ -108,3 +108,10 @@ def test_a_hosted_provider_without_a_key_is_refused_before_any_call(provider):
 
 def test_a_local_model_needs_no_key(provider):
     assert _check(provider().url, key=None).ok
+
+
+def test_the_check_identifies_itself_instead_of_sending_pythons_default_user_agent(provider):
+    # Found live: Groq (behind Cloudflare) answers "Python-urllib/3.x" with HTTP 403 (error 1010) -- a good key reported as rejected.
+    p = provider()
+    assert _check(p.url).ok
+    assert p.seen[0]["agent"].startswith("fello-pulse/") and "urllib" not in p.seen[0]["agent"].lower()

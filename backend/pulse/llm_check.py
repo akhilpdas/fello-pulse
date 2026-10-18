@@ -50,7 +50,7 @@ def check_llm(*, provider: str, base_url: str | None, model: str, api_key: str |
 
     body = json.dumps({"model": model, "max_tokens": 8, "temperature": 0,
                        "messages": [{"role": "user", "content": "Reply with the single word: pong"}]}).encode()
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json", "User-Agent": "fello-pulse/1.0"}   # Cloudflare-fronted providers (Groq) refuse Python's default agent with a 403
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions", data=body, headers=headers, method="POST")
