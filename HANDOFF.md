@@ -658,3 +658,36 @@ All three built test-first (`superpowers:test-driven-development`):
 - **Hosting research (nothing deployed):** AWS new accounts get $100–$200 credits on a Free Plan that ends after 6 months or when credits are spent (then the account closes); a 4 GB Graviton server (t4g.medium) is ~$25–30/month, so credits cover a short review. Cloudflare quick tunnel from the Mac is free but ephemeral. Oracle's free ARM tier was reportedly halved. Render free does not fit (sleeps; no free worker; DB expires in 30 days).
 - **Observation to decide on:** the weekly queue's top 12 are mostly green/amber large renewals (priority = risk × value × urgency; only ~7 accounts clear the red threshold 0.32). By design, but it reads oddly in a demo about "red accounts".
 - **Not committed.**
+
+
+---
+
+## Demo polish: tier cut-offs, disambiguator, packaging (2026-10-18)
+
+- **Committed and pushed earlier today:** browse/history/B-30/LLM-provider/e2e/docs (4 commits to `c20bd76`).
+- **Cut-offs fixed (clarifications B-32):** red ≥ 0.145, amber ≥ 0.098 for all tenants (generator + the demo DB `tenant_config`); newest week now Northwind 52 red/196 amber, Globex 46/131, Initech 4/14. All nine weeks were re-labelled by one SQL UPDATE from the stored probabilities (scores are immutable, so neither the cycle nor `backfill` re-tiers; the cycle was also "not due") from the stored probabilities (the cycle was "not due"), so **drafts for the newly red accounts appear at the worker's next cycle**. Guard test added.
+- **`external_ref` on queue rows** (test-first) and shown beside the name in Queue and All accounts.
+- **Packaging:** `docs/DECK.md` and `docs/LOOM_SCRIPT.md` corrected (they still said no real email/model call had been made); `docs/HOSTING.md` (tunnel from the Mac, or a small AWS server — not deployed); compose header no longer says "unverified".
+- **Counts:** backend 509 passed / 1 skipped, frontend 39. Browser suite re-run: see the next line.
+- **Still open:** model quality (B-15: planted accounts missed, no lead time, AUC 0.69) — deliberately deferred pending the owner's go-ahead; Loom not recorded; nothing hosted.
+
+
+---
+
+## Model quality: the ceiling, four fixes, lead time (2026-10-18) — clarifications B-33
+
+- **Finding that changed the plan:** an oracle handed each account's hidden health (replaying the generator: `generator/oracle_ceiling.py`) scores ROC-AUC 0.65-0.70 per out-of-sample fold. The "low 0.8s" ceiling in the generator docstring was never measured and is wrong (docstring corrected). The old 0.69 / precision@100 0.29 headline was one ~3-week block; the same model scored mean 0.61 on a rolling backtest. Feature engineering was **not** done: existing features already reconstruct the hidden health (R² 0.78) and adding the true health gained nothing.
+- **Built test-first:** `labels.next_outcome_at` + `PanelRow.outcome_at`; `evaluate.lead_time_report`; `ml/backtest.py` (`rolling_origin_scores`, `backtest_report`); `pipeline.lowest_tier_cutoffs` and the backtest in `pipeline.run` (card keys `rolling_backtest`, `lead_time_days`; `GET /model` serves both); regularised trees; fit on train+val; sigmoid calibration (isotonic gave 100% scores). Mutation-checked the regularisation test.
+- **Numbers (final, deterministic across rebuilds):** rolling AUC 0.624/0.625/0.689/0.706 (mean 0.661; oracle 0.673; was 0.609); hold-out block AUC 0.727, PR-AUC 0.185, precision@100 0.50 (noisy); lead time at amber ≥0.10: 32% of 390 losses flagged, median 72 days, 29% ≥4 weeks; red ≥0.20: 14%.
+- **Cut-offs:** amber 0.10 / red 0.20 for every tenant (supersedes B-32's 0.145/0.098). Newest week: Northwind 52 red / 151 amber, Globex 49 / 88, Initech 0 / 1.
+- **Demo database rebuilt from scratch** with the final config (`run_all.sh` + `backfill --weeks 8`); the sign-in password is unchanged. Restart the API/UI tasks.
+- **SC-006 withdrawn:** both planted accounts are flawed fixtures (one forced to churn by a non-health rule; the other churned a year before its planted collapse and has no billing identity). Not flagged out of sample; the in-sample scores are not claimed.
+- **Not done:** containers not rebuilt with the new model; hyperparameters/calibration chosen on the data later reported (mild optimism, stated); cold-start tenant unchanged; nothing committed.
+
+---
+
+## Containers re-verified with the new model (2026-10-18)
+
+- Rebuilt the images from the current source (Colima, arm64; own project name and port 5273 so the host demo was untouched), `bootstrap-demo` inside the container: hold-out ROC-AUC 0.7267 / PR-AUC 0.1848, rolling folds 0.624 / 0.625 / 0.689 / 0.706, lead time identical to the host build; top of the Northwind queue identical (Castlegate Estates 67.2%, 2,254 below the cut). `backfill --weeks 8` also ran in the container. Torn down afterwards; Colima stopped (it was not running before).
+- **Found by running it, fixed test-first:** the unattended worker writes a new snapshot every 15 minutes, so a day holds many and the Week picker listed near-duplicates (the browser scenario "earlier weeks" failed because "the previous week" was the same date). `GET /queue/snapshots` now returns one entry per UTC day, the day's last snapshot (`test_several_cycles_on_one_day_are_one_entry_the_latest_of_that_day`). All 13 browser scenarios then passed against the containers.
+- **Open observation, not changed:** with the worker running, the queue's "Since last cycle" column compares with the previous *cycle* (minutes earlier, so mostly flat), while "What moved" and the picker compare across days. Fine for production semantics, but a demo with the worker on shows little movement in that column; the host demo (worker off) shows the backfilled weekly movement.

@@ -65,7 +65,7 @@ await shot("06-browse-page-2", { marks: [page.getByText(/^Showing 51–100/), ro
 await page.getByRole("button", { name: "Previous" }).click();
 await page.getByText(/^Showing 1–50/).waitFor();
 await page.getByLabel("Tier").selectOption("red");
-await page.getByLabel("Driver").selectOption("payment_friction");
+await page.getByLabel("Driver").selectOption("usage_decline");
 await page.waitForTimeout(900);
 await shot("07-browse-filtered", { marks: [page.getByLabel("Tier"), page.getByLabel("Driver")], full: false });
 await page.getByLabel("Tier").selectOption("");

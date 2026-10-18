@@ -164,7 +164,7 @@ Sign in as the northwind operator and open **Queue**.
 - ✅ **Why** is one of the six drivers.
 - ✅ Under the table: **2254 more accounts below the weekly capacity cut** and **Browse all accounts →**.
 
-> **Do not be surprised** that many of the top 12 are green or amber. The order is *risk × value at risk × urgency*, so a very large account renewing soon can outrank a riskier small one. Only a handful of accounts (about 7) clear the red threshold at all. Risk on its own is therefore not sorted descending: that is intentional.
+> **Do not be surprised** if one of the top 12 is green. The order is *risk × value at risk × urgency*, so a very large account renewing soon can outrank a riskier small one. Red means at least a 20% chance of a loss within 90 days (about five times an average account's risk) and amber at least 10%; Northwind has about 50 red and 150 amber accounts. Risk on its own is therefore not sorted descending: that is intentional. The small grey text beside each name is the CRM reference; account names repeat inside a workspace, the reference does not.
 
 ## B2 · The week picker and history
 
@@ -188,9 +188,9 @@ Sign in as the northwind operator and open **Queue**.
 ![Page 2. Rank 51 onwards.](img/06-browse-page-2.png){width=6.4in}
 
 4. **Search:** type part of a name. ✅ The list narrows after a moment and every name contains your text.
-5. **Filter:** choose **Tier = red** and **Driver = Payment friction**.
+5. **Filter:** choose **Tier = red** and **Driver = Usage decline**.
 
-![Filters combined. Only red accounts whose main driver is Payment friction remain.](img/07-browse-filtered.png){width=6.4in}
+![Filters combined. Only red accounts whose main driver is Usage decline remain.](img/07-browse-filtered.png){width=6.4in}
 
 6. ✅ Only matching rows. Search for nonsense such as `zzzzqq`: ✅ **No accounts match.**
 7. Change the **Week** here: ✅ the list changes, and **← This week's queue** returns you to the same week.
@@ -201,7 +201,7 @@ Open any account from the queue.
 
 ![The account page. The drivers show what pushes the score up.](img/08-account-top.png){width=6.4in}
 
-- ✅ A header with the account name and tier, then one line such as **9.9% risk · $1,945,627 at risk · mainly Commercial signals**.
+- ✅ A header with the account name and tier, then one line such as **67.2% risk · $842,233 at risk · mainly Commercial signals**.
 - ✅ **What is driving it**: bars for the six drivers.
 - ✅ **Evidence**: one line per driver. Click one, then click a record.
 
@@ -215,7 +215,7 @@ Open any account from the queue.
 
 ![What moved. The line shows the risk before and after; the table shows which measurements changed it most.](img/10-account-what-moved.png){width=6.4in}
 
-2. ✅ A line such as **14.7% → 9.9% (▼ 4.8 pts)** and a table **Feature · From · To · Contribution change**, biggest change first. This answers "why did it move" without a data request.
+2. ✅ A line such as **36.8% → 67.2% (▲ 30.4 pts)** and a table **Feature · From · To · Contribution change**, biggest change first. This answers "why did it move" without a data request.
 3. If the account did not exist in that week, you get a clear message in place of a table, not a crash.
 
 ## B6 · Your judgement: confirm, false positive, suppress ✏️
@@ -465,9 +465,10 @@ curl -s -b /tmp/op.txt -X PATCH localhost:8000/admin/config \
 
 `curl -s -b /tmp/op.txt localhost:8000/model | python3 -m json.tool | head -80`
 
-- ✅ **Operating point:** precision at weekly capacity about **0.29**, against about 0.04 for a trivial baseline and 0.02 for a hand-built heuristic. **ROC-AUC about 0.69.**
-- ✅ **Per-workspace** results, and **leave-one-workspace-out**: a small new workspace (initech) gets almost nothing from the shared model (ROC-AUC about 0.53).
-- ✅ Anything the pipeline could not produce says **available: false** with a reason (for example lead time). It is stated, not invented. A CSM gets `403` here.
+- ✅ **Operating point:** precision at weekly capacity about **0.5** on the latest block (one draw; it moves a lot), against about 0.04 for a trivial baseline and 0.02 for a hand-built heuristic. **ROC-AUC about 0.73** on that block.
+- ✅ **Per-workspace** results, and **leave-one-workspace-out**: a small new workspace (initech) gets almost nothing from the shared model (ROC-AUC about 0.46).
+- ✅ **Lead time** and the **rolling backtest**: ROC-AUC by fold (about 0.62, 0.63, 0.69, 0.71) and, for the amber and red lines, how many of the 390 losses were flagged (about 32% and 14%) and a median of about 70 days ahead.
+- ✅ Anything the pipeline could not produce says **available: false** with a reason. It is stated, not invented. A CSM gets `403` here.
 - Honest reading: the model is moderately useful, not magic.
 
 \newpage
@@ -516,13 +517,13 @@ PULSE_LLM_BASE_URL=http://127.0.0.1:11434/v1 PULSE_LLM_MODEL=qwen2.5:7b \
 
 # Part G — Things that are true, so you are not surprised
 
-- **The weekly queue is dominated by large renewals**, not only red accounts, by design (risk × value × urgency). Only about 7 accounts are red.
+- **The weekly queue is dominated by large renewals**, not only red accounts, by design (risk × value × urgency). About 50 Northwind accounts are red and about 150 amber (cut-offs 20% and 10% of calibrated risk, clarifications B-32 and B-33).
 - **Backfilled history is in-sample:** the model learned from those same weeks, so earlier weeks flatter it. Use them to browse and compare, not to judge the model.
 - **No real email provider has been exercised.** The local inbox is real SMTP, but STARTTLS, authentication, rate limits, bounces and spam filtering are untested. Bounces and replies are not processed.
 - **A free local model writes plainer, sometimes slightly awkward prose** than a frontier model. The guardrails, not the model, are what make it safe.
 - **All demo users share one password**; there is no SSO or MFA; cookies are not marked `Secure` (needs HTTPS); the app's database role passwords are development defaults.
 - **Account names repeat** within a workspace (as in a real CRM). Drafts for accounts with no CRM record greet by reference and cannot be sent.
-- **Model quality:** ROC-AUC about 0.69. The two planted "lost renewal" accounts are missed, lead time is not reported, and a small new workspace gets little from the shared model.
+- **Model quality:** rolling ROC-AUC about 0.661, close to the ceiling of about 0.7 for this data. The two planted "lost renewal" accounts are missed (they are flawed fixtures), about 70% of losses are not flagged at the amber line, and a small new workspace gets little from the shared model.
 - **All data is simulated;** addresses end in `@example.com`.
 
 # Reset

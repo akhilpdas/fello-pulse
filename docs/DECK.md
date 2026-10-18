@@ -7,7 +7,7 @@
 Health-score dashboard + auto-email red accounts → ranked, bounded, evidence-backed queue + reviewed drafts. (D1–D6)
 
 ## 3. The Monday queue
-Tier, risk, value at risk, renewal distance, main driver, delta since last cycle, and the below-the-cut count.
+Tier, risk, value at risk, renewal distance, main driver, delta since last cycle, and the below-the-cut count. Week picker for earlier weeks; *All accounts* pages through the whole ranking, with search and tier/driver filters.
 
 ## 4. Every number has a trail
 Drivers → evidence ids → original source payload. Score diff: what moved, by how much.
@@ -22,10 +22,10 @@ Drafts by default. Auto-send: per tenant, per play, opt-in, suppression + rate l
 Point-in-time · model ranks/LLM writes (only from derived facts; output rejected if a number or claim is untraceable) · reviewed boundary · tenant isolation (RLS, mutation-verified; tenant from a verified session, never a header) · explained outputs.
 
 ## 8. Does the model earn its place?
-Precision@100 0.29 vs 0.02 baseline (~12×; range 0.22–0.33 by row order); AUC 0.69; promotion is gated on beating the baseline at the operating point.
+Rolling backtest (4 folds, last 52 weeks, each fold scored by a model that saw only what was known then): ROC-AUC 0.661, against 0.673 for an oracle that knows every account's hidden health — on this data 0.7 is close to the ceiling. Lead time over all 390 losses: at the amber line (≥10% risk, 4.6% of account-weeks) 32% flagged, median 72 days ahead; oracle 33%. Precision@100 about 0.5 vs 0.02 for the heuristic on the latest block (one draw). Promotion is gated on beating the baseline at the operating point.
 
 ## 9. What we are honest about
-Two planted lost-renewal accounts not flagged → lead time not claimed (B-15). A new small tenant gets almost nothing from the shared model (cold-start AUC 0.53). No real email sent and no real model call made — built and tested against stand-ins; containers built and run on arm64 only (browser suite passes against them).
+The two planted lost-renewal accounts are not flagged out of sample, and they are poor tests (one is forced to churn by a rule no health signal shows; the other churned a year before its planted collapse) — so lead time is measured over every loss instead (B-33). About 70% of losses are not foreseeable from these signals. A new small tenant gets almost nothing from the shared model (cold-start AUC 0.46). Email was verified over real SMTP against a local mail server, including an unattended send, but no real mail provider has been used. Drafting ran for real against a free local model (20 of 20 drafts passed the guardrails); the Anthropic provider has not been run against the real API. Containers built and run on arm64 only (browser suite passes against them). Earlier-week scores are in-sample, for browsing only.
 
 ## 10. 10× and what's next
-Cycle is first to break (batched loading, more workers). Next: response-time feature work with held-out validation, uplift once intervention history exists.
+Cycle is first to break (batched loading, more workers). Next: uplift once intervention history exists. More features would not help here — the existing ones already reconstruct the hidden health (R² 0.78) and adding the true health gained nothing.

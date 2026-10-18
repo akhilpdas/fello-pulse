@@ -26,13 +26,11 @@ writes, only from derived facts, and its output is rejected if any number or cla
 enforced in Postgres, mutation-tested, with the tenant taken from a verified session, never a header ·
 every number traces to evidence.
 
-**Results (seed-reproducible).** Precision@100 **0.29** vs 0.02 for the heuristic baseline (one draw from 0.22–0.33, see B-27);
-ROC-AUC **0.69**; a full cycle over ~4,500 accounts in ~105 s against a 15-minute interval.
+**Results (seed-reproducible).** Rolling-backtest ROC-AUC **0.661** (an oracle holding each account's hidden health: 0.673 — the data's ceiling is near 0.7); lead time over all 390 losses: **32%** flagged at the amber
+line, a median **72 days** ahead; precision@100 about 0.5 vs 0.02 for the heuristic (latest block, one draw); a full cycle over ~4,500 accounts in ~105 s against a 15-minute interval.
 
-**What is not done.** The two planted "lost renewal" accounts are *not* flagged by the model, so we
-cannot yet claim lead time; the shortfall is diagnosed (response-time vs ticket-volume attribution) and
-documented, not hidden. Email delivery and language-model drafting are built and tested against stand-ins, but **no real
-email has been sent and no real model call made**; the containers were built and run on one machine only (arm64, Colima); no SSO/MFA;
+**What is not done.** The two planted "lost renewal" accounts are still *not* flagged out of sample (both are flawed fixtures, B-33), so lead time is measured over every loss instead; about 70% of losses are
+not foreseeable from these signals. Email was verified over real SMTP against a local mail server and drafting ran against a free local model, but **no real mail provider and no Anthropic API call has been used**; the containers were built and run on one machine only (arm64, Colima); no SSO/MFA;
 no uplift modelling; the Loom is a script, not a recording.
 
 **First thing to break at 10×.** The cycle (per-account event loading, ~19 min at 50k vs a 15-min

@@ -87,8 +87,9 @@ Every demo user in a database shares one password. **It is never in git.** Where
 6. **Sign out, sign in as `csm01@northwind.example.com`.** A much smaller queue (their own accounts only); there is no **Admin** link, and the server refuses the admin API even if you type the URL.
 7. **Back as the operator → Admin.** Outbound email is *off until a sender is verified*; demo mode is on; opt-outs; users; the audit trail of who did what.
 8. **Run log.** Each cycle's stage counts and the **declined decisions with reasons** — what the agent chose *not* to do, and why.
-9. **Be candid** (this is what the exercise rewards): precision@100 is about **0.29 against 0.02** for the heuristic baseline — one draw from 0.22–0.33; ROC-AUC 0.69; a small new
-   tenant gets almost nothing from the shared model; the two planted "lost renewal" accounts are *not* flagged, so lead time is not claimed. See `README.md` and `clarifications.md` B-15, B-27.
+9. **Be candid** (this is what the exercise rewards): on a rolling backtest ROC-AUC averages **0.661** (an oracle that knows every account's hidden health gets 0.673 — about 0.7 is the ceiling on this data);
+   at the amber line it flags **32%** of the losses, a median **72 days** ahead; a small new tenant gets almost nothing from the shared model; the two planted "lost renewal" accounts are *not* flagged out of sample, and that is
+   explained, not tuned away. See `README.md` and `clarifications.md` B-15, B-27.
 
 ## Which language model is used, and for what
 
