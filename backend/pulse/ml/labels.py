@@ -66,7 +66,13 @@ def outcome_events(events: list[EventRecord], contraction_threshold: float) -> l
     return sorted(out, key=lambda o: o.occurred_at)
 
 
+def next_outcome_at(outcomes: list[OutcomeEvent], as_of: datetime, horizon_days: int) -> datetime | None:
+    """When the first qualifying loss event in (as_of, as_of + horizon] happened, or None. The date behind a
+    positive label -- lead time (how early a flag came) cannot be measured without it."""
+    end = as_of + timedelta(days=horizon_days)
+    return min((o.occurred_at for o in outcomes if as_of < o.occurred_at <= end), default=None)
+
+
 def label_for_window(outcomes: list[OutcomeEvent], as_of: datetime, horizon_days: int) -> bool:
     """True iff a qualifying loss event falls in (as_of, as_of + horizon]."""
-    end = as_of + timedelta(days=horizon_days)
-    return any(as_of < o.occurred_at <= end for o in outcomes)
+    return next_outcome_at(outcomes, as_of, horizon_days) is not None

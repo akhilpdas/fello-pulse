@@ -66,5 +66,7 @@ def get_model_report(directory: Path = Depends(get_artifacts_dir)):
         "per_tenant": m.get("per_tenant", {}),
         "leave_one_tenant_out": m.get("leave_one_tenant_out")
         or _unavailable("the training pipeline that produced this model did not run leave-one-tenant-out"),
-        "lead_time_days": lead if lead else _unavailable("lead time requires outcome dates the panel does not carry"),
+        "lead_time_days": lead if lead else _unavailable("this model was trained before the rolling backtest existed"),
+        "rolling_backtest": m.get("rolling_backtest")
+        or _unavailable("this model was trained before the rolling backtest existed"),
     })

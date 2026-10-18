@@ -22,6 +22,7 @@ from pulse.features.repository import (
     load_account_feature_input,
     load_events,
 )
+from pulse.ml.backtest import backtest_report
 from pulse.ml.evaluate import (
     brier,
     captured_acv_at_capacity,
@@ -46,6 +47,10 @@ from pulse.ml.registry import (
 from pulse.ml.train import Split, predict_proba, time_based_split, train
 
 
+BACKTEST_WEEKS = 52   # the evaluation window of the rolling backtest, in weekly snapshots
+BACKTEST_FOLDS = 4
+
+
 def trainable_tenants(session) -> list[tuple]:
     """Tenants whose data arrived through ingestion (they have a watermark).
     Tenants seeded directly -- test fixtures, consoles -- are excluded so they
@@ -55,6 +60,15 @@ def trainable_tenants(session) -> list[tuple]:
              " (SELECT 1 FROM ingestion_watermark w WHERE w.tenant_id = tenant.id)"
              " ORDER BY slug")
     ).all())
+
+
+def lowest_tier_cutoffs(session, tenant_ids) -> dict[str, float]:
+    """The loosest amber and red cut-offs among the given tenants -- what the lead-time backtest counts as "flagged"."""
+    row = session.execute(
+        text("SELECT min(tier_amber_at), min(tier_red_at) FROM tenant_config WHERE tenant_id = ANY(:t)"),
+        {"t": list(tenant_ids)},
+    ).one()
+    return {"amber": float(row[0]), "red": float(row[1])}
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +205,18 @@ def run(clock: Clock | None = None, out_dir: Path = Path("../artifacts")) -> dic
         capacity=capacity,
     )
     metrics["leave_one_tenant_out_seconds"] = round(time.time() - t_loto, 1)
+
+    # Out-of-sample lead time over every loss event, not just the last few weeks (SC-005; clarifications B-33).
+    with elevated_session() as s:
+        cutoffs = lowest_tier_cutoffs(s, [tid for tid, _ in trainable_tenants(s)])
+    t_bt = time.time()
+    backtest = backtest_report(
+        rows, horizon_days=settings.horizon_days, eval_weeks=BACKTEST_WEEKS, n_folds=BACKTEST_FOLDS, thresholds=cutoffs,
+        train_fn=lambda r: train(time_based_split(r), seed=settings.model_seed),
+        predict_fn=lambda m, r: list(predict_proba(m, [x.feature_values for x in r])))
+    backtest["seconds"] = round(time.time() - t_bt, 1)
+    metrics["rolling_backtest"] = backtest
+    metrics["lead_time_days"] = {"median": backtest["lead_time"]["amber"]["median_days"], **backtest["lead_time"]}
 
     try:
         check_plausibility(metrics["roc_auc"], settings.auc_plausibility_ceiling)

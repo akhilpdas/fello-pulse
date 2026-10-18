@@ -15,7 +15,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from pulse.features.compute import EventRecord, compute
 from pulse.features.denylist import AccountFeatureInput
-from pulse.ml.labels import label_for_window, outcome_events
+from pulse.ml.labels import next_outcome_at, outcome_events
 
 
 def monday_on_or_after(d: date) -> date:
@@ -28,6 +28,7 @@ class PanelRow:
     as_of: datetime
     feature_values: dict
     label: bool
+    outcome_at: datetime | None = None  # when the loss behind a positive label happened
 
 
 def build_account_panel(
@@ -60,7 +61,7 @@ def build_account_panel(
             connected_sources=connected_sources, account=account_input,
             events=events, as_of=as_of, identity_unresolved=identity_unresolved,
         )
-        label = label_for_window(outcomes, as_of, horizon_days)
-        rows.append(PanelRow(account_id, as_of, result.values, label))
+        outcome_at = next_outcome_at(outcomes, as_of, horizon_days)
+        rows.append(PanelRow(account_id, as_of, result.values, outcome_at is not None, outcome_at))
         d += timedelta(days=7)
     return rows

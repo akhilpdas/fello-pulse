@@ -348,6 +348,8 @@ shipped.
 
 ### B-15 — A known, honestly reported gap: real-world model skill vs. the two retrospective fixtures (SC-006)
 
+> **Update 2026-10-18 (B-33):** the ceiling below was a misreading — about 0.7 ROC-AUC is the most this data allows, and the model now reaches 0.661 on a rolling backtest. The two fixtures are flawed and SC-006 is withdrawn; lead time is measured over every loss instead. The diagnosis below is kept as written.
+
 The full pipeline was run end to end against the real ingested dataset
 (5,000 accounts, ~131k weekly panel rows, 3 tenants). Results:
 
@@ -454,6 +456,8 @@ northwind-based tests remain fine because they assert generic properties
 run history.
 
 ### B-21 — Lead time is not reported, and the report says so (SC-005, FR report)
+
+> **Update 2026-10-18 (B-33):** lead time is now reported, over all loss events, from a rolling out-of-sample backtest (`PanelRow.outcome_at` carries the date). Text below is the original reasoning.
 
 `GET /model` returns `lead_time_days: {"available": false, "reason": ...}` rather than a
 number. Lead time needs the date of each outcome next to the first threshold crossing, and
@@ -624,3 +628,55 @@ Every guardrail is unchanged because they live in the drafter, not the client: g
 **Verified for real:** Ollama + `qwen2.5:7b` — direct drafter calls (2–4 s each) and a full cycle (20 drafts, 20 accepted, 0 fallbacks, 148 s for three workspaces).
 **Limits.** A 7B local model writes plainer, sometimes slightly awkward prose ("Your CSM, Your CSM" appeared once); the validator accepts it because it asserts nothing unsupported — grounding is not style.
 The Anthropic provider is unchanged and still unrun against the real API. Free hosted tiers and their limits change; none was exercised.
+
+### B-32 — Red/amber cut-offs were off the model's scale; the demo showed almost no red (found 2026-10-18; cut-off values superseded by B-33)
+
+After B-30 the newest Northwind week had 7 red accounts of 2,512, Globex none and Initech none, so a product about "red accounts" opened looking blind. Cause: the generator's per-tenant cut-offs
+(red 0.32/0.38/0.35, amber 0.14/0.18/0.15) were chosen before any model existed. The model's calibrated probabilities average ~4% and, because isotonic calibration produces plateaus, take only a handful
+of values (…0.0986, 0.0995, 0.147, 0.212, 0.355). **Decision:** red ≥ 0.145 (about 3.6× the typical account's risk), amber ≥ 0.098, the same in all three tenants — placed in the gaps between plateaus so a cut-off means
+exactly "this plateau and above". (A first attempt at 0.099 split the 0.0986/0.0995 pair and showed up in a screenshot as green and amber rows both reading 9.9%.) Result: Northwind 52 red / 196 amber, Globex 46 / 131, Initech 4 / 14. Ranking is untouched (priority never uses the tier); only the badge and which accounts the agent
+treats as red/amber changed. Guard: `tests/unit/test_generator_tier_cutoffs.py`. Caveats: (1) per-tenant differences between cut-offs were deliberate (User Story 5) and are now only in capacity and suppression;
+operators can still set their own on the Admin page. (2) These cut-offs are tied to the current model's plateaus and must be revisited whenever a model is retrained (an operating-point-derived cut-off is the
+better long-term design). (3) The top 12 of the queue can still contain green accounts: priority = risk × value × urgency, so a very large renewal at modest risk outranks a small red one — by design (D3).
+
+Also in this change: queue rows now carry the account's CRM reference (`external_ref`), shown beside the name, because account names repeat inside a tenant.
+
+Note on history: a stored score is never overwritten (`ON CONFLICT DO NOTHING`), so changing a cut-off does not re-tier past weeks by itself, and `backfill` does not either. For the demo database the tier labels of every non-abstained
+snapshot were re-derived from the stored probabilities with one UPDATE (tier is a pure function of probability and the cut-offs), so all nine weeks share one scale; a freshly built database gets the new cut-offs from its first score.
+
+
+### B-33 — The headline was one lucky window; what the ceiling really is, what was fixed, and lead time at last (2026-10-18)
+
+**1. How good can anything be on this data?** The generator draws each loss from a hidden health path (`generator/simulate.py`), so replaying it gives that path back and an *oracle* can be scored: renewal-day churn from the
+mean health over the prior 90 days, a health-dependent contraction hazard, and exogenous churn, each computed from the health known at the row's date (`python3 generator/oracle_ceiling.py`, ~3 minutes, needs the demo database). On the
+same four out-of-sample folds the oracle scores ROC-AUC **0.665 / 0.649 / 0.684 / 0.696 (mean 0.673)**. The generator's docstring promised "low-to-mid 0.8s"; that was never measured and is wrong — about half of all losses are
+contractions or exogenous churn (2.8%/yr), and an account in poor health usually renews anyway. So the "model is far below the generator's ceiling" reading in B-15 was a misreading: **about 0.7 is the ceiling here.**
+
+**2. The old headline was one window.** The 0.69 AUC / 0.29 precision@100 came from a single test block (the last ~3 weeks, 13,086 rows, 489 positives; standard error of AUC about ±0.025, of precision@100 about ±0.05). A rolling-origin backtest —
+four consecutive folds over the last 52 weeks, each scored by a model refitted only on rows whose 90-day outcome was already known when the fold began (`pulse.ml.backtest`, run by `pipeline.run` and reported by `GET /model`) — gave
+**0.604 / 0.574 / 0.608 / 0.649 (mean 0.609)** for the model as it stood. The honest number was lower than the headline, and well under the oracle.
+
+**3. Four changes, each with a test written first (`tests/unit/test_train_regularised.py`, `test_rolling_backtest.py`, `test_lead_time_report.py`):**
+- *Regularised trees* — depth 2, learning rate 0.05, 400 rounds, 1% of the rows fitted per leaf (capped at 300, floored at the library's 20, so tiny test models can still split), L2 1.0 instead of the library defaults, which memorise ~4%-positive, noisy data. On the rolling folds mean AUC went 0.622 → 0.671 in the experiment (all four folds improved).
+  Chosen on the first three folds; the latest fold, left untouched, went 0.679 → 0.709. Guarded by a synthetic-data test (six seeds; mutation-checked: with default settings it goes red).
+- *The validation block is learned from.* It was never used for tuning or early stopping, so a quarter of the history was simply not fitted. Test: a split where only the validation block carries signal.
+- *Sigmoid (Platt) calibration instead of isotonic.* Isotonic, fitted on a few thousand rare-positive rows, produced accounts at 100% and 87% risk and only ~20 distinct scores, and was overconfident where it mattered (predicted 0.36, observed 0.28 among scores ≥ 0.25;
+  sigmoid 0.40 vs 0.41), with the best Brier and log-loss of the three options. Test: no score above 0.95 and thousands of distinct scores. This also removes the plateau problem behind B-32.
+- *Red/amber cut-offs restated on the calibrated scale* — amber ≥ 0.10 (a 10% chance of a loss within 90 days), red ≥ 0.20, the same for all three workspaces (about 2.4× and 4.8× an average account). Supersedes the 0.145/0.098 of B-32, which were placed between isotonic plateaus.
+  Newest week: Northwind 52 red / 151 amber, Globex 49 / 88, Initech 0 / 1 (the cold-start workspace: the model does not claim to see risk it cannot).
+
+**4. Result.** Rolling ROC-AUC by fold **0.624 / 0.625 / 0.689 / 0.706 (mean 0.661)** against the oracle's 0.673. Latest hold-out block: ROC-AUC 0.727 (was 0.690), PR-AUC 0.185 (0.106), Brier 0.0331, precision@100 0.50 (0.29; one draw, do not quote to two decimals)
+against 0.023 for the heuristic. Per tenant: globex 0.777, northwind 0.721, initech 0.466 (3 churns; cold start unchanged). Leave-one-tenant-out: globex 0.747, northwind 0.690, initech 0.458.
+
+**5. Lead time (SC-005) is now reported — over every loss event, not two hand-picked accounts** (`lead_time_report`: an event is flagged if any weekly row in the 90 days before it scored at or above the line; lead time runs from the earliest such row; unflagged events count against recall).
+Over the 390 losses in the 52 evaluation weeks: at **amber (≥0.10)** — 4.6% of account-weeks flagged — **32% of losses flagged, median 72 days ahead, 29% at least four weeks ahead**; at **red (≥0.20)** — 0.9% of account-weeks — 14% flagged, median 69.5 days.
+The oracle at the same alert rates: 33% at a median 84 days (amber), 12% at 83 days (red). So the model recovers about as much as hidden-health knowledge allows; **the other ~70% of losses are not foreseeable from these signals**. Two cautions: a high median is partly
+the horizon (nothing can be flagged more than 90 days ahead, and risky accounts tend to be risky for a long time), and a flag is a probability, not a prediction — most flagged account-weeks are not followed by a loss.
+
+**6. SC-006 (the two planted accounts) cannot be met, and the fixtures are why.** `northwind-00000` ("slow support decline") is forced to churn at ≥93% by a rule in the generator that the health path does not contain; even the oracle gives it at most 13%, and the model — scored only by models that
+never saw it — peaks at 0.033. (The final model, fitted on weeks up to 2026-05-04, scores it up to 0.34 later, but those weeks are in or next to its fitting data, so that is not evidence and is not claimed.) `northwind-00009` ("champion collapse") churned on 2025-08-21 at its first
+anniversary by an ordinary draw, a year *before* the collapse planted for August 2026, and has no Stripe identity link, so its loss is not even labelled. Neither fixture was tuned for. SC-006 as written is withdrawn in favour of item 5.
+
+**7. What was not done, and why.** *No feature engineering:* the existing features reconstruct the hidden health with R² ≈ 0.78, and giving the model the true hidden health as extra features changed rolling mean AUC from 0.671 to 0.667 (nothing) — the response-time idea in B-15 was a hypothesis, not a bottleneck.
+*Selection caveats:* the hyperparameters were chosen on folds 0–2 of the backtest later reported and the calibration method by Brier/log-loss on the hold-out block, so the 0.661 is mildly optimistic; fold 3 and the oracle comparison are the guards against over-reading it. *Containers* were not rebuilt with the new model
+(the "identical to host" check in the README refers to the previous one). *Unchanged:* the cold-start result for small tenants, no per-tenant model.

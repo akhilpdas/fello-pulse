@@ -168,3 +168,31 @@ def lead_time_days(as_of_times: list, flagged_mask: list[bool], outcome_at) -> i
         return None
     first_flag = min(flagged_times)
     return (outcome_at - first_flag).days
+
+
+def lead_time_report(rows, scores, *, threshold: float) -> dict:
+    """Warning given across every loss event in ``rows`` (SC-005). An event is one account's loss, identified by its
+    date; it is *flagged* if any of the weekly rows leading up to it scored at or above ``threshold``, and its lead
+    time runs from the earliest such row. Unflagged events lower ``recall`` and stay out of the median, so the median
+    alone never flatters the model. ``alert_rate`` is the price paid: the share of all rows at or above the threshold."""
+    flagged_total = sum(1 for sc in scores if sc >= threshold)
+    first_flag: dict[tuple, object] = {}
+    events: set[tuple] = set()
+    for r, sc in zip(rows, scores, strict=True):
+        if r.outcome_at is None:
+            continue
+        key = (r.account_id, r.outcome_at)
+        events.add(key)
+        if sc >= threshold and (key not in first_flag or r.as_of < first_flag[key]):
+            first_flag[key] = r.as_of
+    leads = sorted((key[1] - t).days for key, t in first_flag.items())
+    n = len(events)
+    return {
+        "threshold": threshold,
+        "n_events": n,
+        "n_flagged": len(leads),
+        "recall": len(leads) / n if n else None,
+        "median_days": float(np.median(leads)) if leads else None,
+        "share_flagged_28d_or_more_ahead": sum(1 for d in leads if d >= 28) / n if n else None,
+        "alert_rate": flagged_total / len(scores) if scores else None,
+    }

@@ -26,9 +26,14 @@ Three noise sources are deliberate and non-negotiable:
    unhealthy accounts frequently renew. Without this the label would be nearly a
    threshold on the latent state and the problem would collapse to a trivial one.
 
-Together these cap achievable ROC-AUC somewhere in the low-to-mid 0.8s. A
-backtest reporting 0.97 on data like this would be evidence of a broken harness,
-and ``tests/unit/test_performance_plausibility.py`` fails the build if it happens.
+Together these cap achievable ROC-AUC far lower than first estimated. This
+docstring once said "low-to-mid 0.8s"; measuring it (clarifications B-33) showed
+that was wrong: a predictor that is *given* each account's hidden health scores
+about 0.65-0.70 ROC-AUC per out-of-sample fold, because half of all losses are
+contractions or exogenous churn and an unhealthy account usually survives its
+renewal anyway. A backtest reporting 0.97 on data like this would be evidence of
+a broken harness, and ``tests/unit/test_performance_plausibility.py`` fails the
+build if it happens.
 """
 
 from __future__ import annotations

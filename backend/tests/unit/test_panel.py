@@ -75,3 +75,23 @@ def test_panel_row_label_reflects_outcome_in_its_own_horizon():
     # A much later Monday, after the cancellation already happened, sees nothing
     # new ahead of it within its own horizon.
     assert by_date[date(2026, 3, 2)] is False
+
+
+def test_panel_row_carries_the_date_of_the_outcome_its_label_refers_to():
+    # Lead time needs to know *when* the loss happened, not only that one did (clarifications B-21).
+    first_event = datetime(2026, 1, 5, 9, tzinfo=UTC)
+    cancel_at = first_event + timedelta(days=20)
+    events = [
+        EventRecord(1, "zendesk", "support.ticket_created", first_event, first_event,
+                    {"ticket_ref": "t1", "priority": "low", "subject": "x", "requester_ref": "u1"}),
+        EventRecord(2, "stripe", "billing.subscription_deleted", cancel_at, cancel_at,
+                    {"subscription_ref": "s1", "reason": "x"}),
+    ]
+    rows = build_account_panel(
+        account_id="acct-1", connected_sources=frozenset({"zendesk", "stripe"}),
+        account_input=AccountFeatureInput.from_row({"signup_date": date(2025, 1, 1)}),
+        events=events, contraction_threshold=0.25, horizon_days=28, dataset_end=datetime(2026, 4, 1, tzinfo=UTC),
+    )
+    by_day = {r.as_of.date(): r for r in rows}
+    assert by_day[date(2026, 1, 5)].label and by_day[date(2026, 1, 5)].outcome_at == cancel_at
+    assert not by_day[date(2026, 2, 16)].label and by_day[date(2026, 2, 16)].outcome_at is None

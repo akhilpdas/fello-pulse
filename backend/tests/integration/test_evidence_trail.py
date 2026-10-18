@@ -91,6 +91,10 @@ def test_contributions_reconcile_to_the_models_own_output():
     tenant_id, account_id = _northwind_account_with_history()
     model = _toy_model()
     as_of = datetime(2026, 8, 8, 9, 0, tzinfo=UTC)
+    # A stored score is never overwritten (ON CONFLICT DO NOTHING), and this account lives in a database shared by every
+    # run, so a row left by an earlier run's model would be compared against *this* model's attribution. Start clean.
+    with owner_session() as s:
+        s.execute(text("DELETE FROM score WHERE account_id = :a AND as_of = :ao"), {"a": account_id, "ao": as_of})
 
     with tenant_session(tenant_id) as s:
         cfg = s.execute(

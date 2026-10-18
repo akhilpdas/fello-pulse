@@ -98,3 +98,16 @@ def test_missing_leave_one_tenant_out_is_stated_with_a_reason(tmp_path):
     r = _client(tmp_path, [_card("m-1", True, "2026-10-01")]).get("/model")
     section = r.json()["leave_one_tenant_out"]
     assert section["available"] is False and section["reason"]
+
+
+def test_the_rolling_backtest_is_reported_when_the_pipeline_ran_it(tmp_path):
+    backtest = {"method": "rolling origin", "auc_by_fold": [0.64, 0.62, 0.69, 0.71], "auc_mean": 0.665,
+                "eval_weeks": 52, "n_folds": 4, "n_scored": 100, "lead_time": {}}
+    body = _client(tmp_path, [_card("m-1", True, "2026-10-01", rolling_backtest=backtest)]).get("/model").json()
+    assert body["rolling_backtest"]["auc_by_fold"] == [0.64, 0.62, 0.69, 0.71]
+    assert body["rolling_backtest"]["auc_mean"] == 0.665
+
+
+def test_a_card_without_a_backtest_says_so(tmp_path):
+    body = _client(tmp_path, [_card("m-1", True, "2026-10-01")]).get("/model").json()
+    assert body["rolling_backtest"]["available"] is False and body["rolling_backtest"]["reason"]

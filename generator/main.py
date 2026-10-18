@@ -182,12 +182,12 @@ def generate_tenant(tenant: TenantSpec, seed: int, out_root: Path) -> dict:
 def _tenant_config(tenant: TenantSpec) -> dict:
     """Deliberately different per tenant — see spec User Story 5."""
     if tenant.slug == "northwind":
-        return {"weekly_capacity": 12, "tier_red_at": 0.32, "tier_amber_at": 0.14,
+        return {"weekly_capacity": 12, "tier_red_at": 0.20, "tier_amber_at": 0.10,
                 "suppression_days": 14, "max_sends_per_cycle": 30}
     if tenant.slug == "globex":
-        return {"weekly_capacity": 8, "tier_red_at": 0.38, "tier_amber_at": 0.18,
+        return {"weekly_capacity": 8, "tier_red_at": 0.20, "tier_amber_at": 0.10,
                 "suppression_days": 21, "max_sends_per_cycle": 15}
-    return {"weekly_capacity": 10, "tier_red_at": 0.35, "tier_amber_at": 0.15,
+    return {"weekly_capacity": 10, "tier_red_at": 0.20, "tier_amber_at": 0.10,
             "suppression_days": 14, "min_days_history": 21, "max_sends_per_cycle": 10}
 
 

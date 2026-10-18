@@ -72,3 +72,22 @@ def test_label_for_window_true_only_when_event_falls_inside_the_horizon():
 
 def test_label_for_window_false_with_no_outcomes():
     assert label_for_window([], AS_OF, horizon_days=90) is False
+
+
+def test_next_outcome_at_is_the_first_loss_event_inside_the_horizon():
+    from pulse.ml.labels import next_outcome_at
+    first, later = AS_OF + timedelta(days=30), AS_OF + timedelta(days=60)
+    outcomes = outcome_events([_cancel(1, first), _cancel(2, later)], contraction_threshold=0.25)
+    assert next_outcome_at(outcomes, AS_OF, horizon_days=90) == first
+
+
+def test_next_outcome_at_is_none_when_nothing_happens_inside_the_horizon():
+    from pulse.ml.labels import next_outcome_at
+    outcomes = outcome_events([_cancel(1, AS_OF + timedelta(days=120))], contraction_threshold=0.25)
+    assert next_outcome_at(outcomes, AS_OF, horizon_days=90) is None
+
+
+def test_next_outcome_at_agrees_with_the_label():
+    from pulse.ml.labels import next_outcome_at
+    outcomes = outcome_events([_cancel(1, AS_OF + timedelta(days=90))], contraction_threshold=0.25)  # on the boundary
+    assert (next_outcome_at(outcomes, AS_OF, 90) is not None) == label_for_window(outcomes, AS_OF, 90)
