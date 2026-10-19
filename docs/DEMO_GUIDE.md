@@ -121,7 +121,7 @@ Every demo user in a database shares one password. **It is never in git.** Where
 | Sign-in, sessions, roles, per-CSM scoping, audit | **Real**, tested, and exercised in a browser |
 | Scoring, ranking, evidence trail, the unattended worker | **Real** |
 | Email delivery code (SMTP, send gate, demo mode, opt-outs) | **Verified over real SMTP against a local mail server (Mailpit), including an unattended send. No real provider has been used.** Verify with `python3 -m pulse.cli send-test --to <your own address>` after setting `PULSE_SMTP_HOST/PORT/USER/PASSWORD` |
-| Language-model drafting | **Run for real against a free local model (Ollama, `qwen2.5:7b`)**: 20 drafts in one cycle, all passed the guardrails. The Anthropic provider has not been run against the real API |
+| Language-model drafting | **Run for real** against a free local model (Ollama, `qwen2.5:7b`: 20 drafts, all passed the guardrails) and against Groq's free tier (`qwen/qwen3.8-27b`: the 91 model-written drafts in the demo seed, labelled "Drafted by llm"). The Anthropic provider has not been run against the real API |
 | Containers | Built and run on one machine (arm64/Colima); no amd64 build |
 | The customer data | Simulated (a generator); addresses are `@example.com` — nothing can reach a real person |
 

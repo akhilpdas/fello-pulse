@@ -84,8 +84,8 @@ specs/002-…/     production readiness: sign-in, real email, model drafting, co
 
 ## What was verified, and what was not
 
-**Automated, and re-run before each commit:** backend suite (`python3 -m pytest -q`, 436 tests, against its own `pulse_test` database — never the demo one),
-frontend unit tests (`npm test`, 34), and **9 browser scenarios in real Google Chrome** against the real API and a scratch copy of the demo data
+**Automated, and re-run before each commit:** backend suite (`python3 -m pytest -q`, 602 tests, against its own `pulse_test` database — never the demo one),
+frontend unit tests (`npm test`, 49), and **9 browser scenarios in real Google Chrome** against the real API and a scratch copy of the demo data
 (`npm run e2e`: sign-in/out, a wrong password, the operator queue, account feedback and suppression, the operator pages, approving a draft in demo mode,
 CSM scoping and the server refusing the admin API). The OpenAPI contract has a drift test. **Mutation-checked** (each protection removed, a named test goes red):
 tenant isolation, identity forgery, CSM ownership, approver identity, the send gate, demo mode, no-retry-on-ambiguous, the LLM output validator, the
