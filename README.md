@@ -77,7 +77,7 @@ generator/       the simulated estate: 3 tenants, ~5,000 accounts, ~350k events,
 frontend/        React 19 + Vite + TypeScript (sign-in, queue, account, drafts, run log, low confidence, operator Admin)
 frontend/e2e/    Playwright tests that drive the real UI in real Chrome (`npm run e2e`)
 infra/scripts/   pg_bootstrap.sh, run_all.sh, e2e.sh   ·   infra/docker/ + docker-compose.yml (built and run on arm64/Colima)
-docs/            SOLUTION_BRIEF, DECK (+ Pulse_deck.pptx), LOOM_SCRIPT, VERIFICATION (what was checked, how, and what was not)
+docs/            SOLUTION_BRIEF, DECK (+ Pulse_deck.pptx), VERIFICATION (what was checked, how, and what was not)
 specs/001-…/     the delivered system: spec, plan, data model, contracts (incl. openapi.yaml), tasks, clarifications (B-1…B-29)
 specs/002-…/     production readiness: sign-in, real email, model drafting, containers — spec, plan, research, data model, tasks
 ```
@@ -143,7 +143,7 @@ at most 13% — and the other churned a year *before* its planted collapse and h
 - **Operations:** a whole-tenant cycle is one transaction (one bad account fails the tenant's cycle); a persistently failing tenant is retried every 30 s with no backoff; login attempts and
   the audit trail are not exported or paginated beyond the last 200 events.
 - **Containers:** verified on arm64 only; no amd64 build, no scan, no timing of the clean-machine path (see *Containers*).
-- **Presentation:** the deck is an `.pptx` built from `docs/DECK.md`; the Loom walkthrough is a **script** (`docs/LOOM_SCRIPT.md`) and has **not been recorded**; the **hosted demo is live** on Render's free tier (the URL and sign-in are given in the submission message, not in this repository): the single-service image, the Render blueprint, the seed and a go/no-go probe are in `docs/HOSTING.md` (spec 003). A free tier has no worker, sleeps when idle (the first request after an overnight idle took about 48 s to wake), and (Render) expires its database after 30 days; the request-role passwords are development defaults, so restrict the database's network access.
+- **Presentation:** the deck is an `.pptx` built from `docs/DECK.md`; the Loom walkthrough has been **recorded** (the link is in the submission message); the **hosted demo is live** on Render's free tier (the URL and sign-in are given in the submission message, not in this repository): the single-service image, the Render blueprint, the seed and a go/no-go probe are in `docs/HOSTING.md` (spec 003). A free tier has no worker, sleeps when idle (the first request after an overnight idle took about 48 s to wake), and (Render) expires its database after 30 days; the request-role passwords are development defaults, so restrict the database's network access.
 
 ## What breaks first at 10×
 

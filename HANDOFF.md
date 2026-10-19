@@ -759,3 +759,4 @@ Run through the spec-kit flow: `specs/003-hosted-demo/` (spec, plan, 32 tasks), 
 - **Hosted demo:** live on Render's free tier; it does sleep (first request after idle took 48-52 s on 19 Oct, then about 0.8 s). The walkthrough video was recorded on a local copy running the same code and seed; the email says so.
 - **Spec 003:** T022, T024 (dropped: Render sufficed), T031 and T032 closed.
 - **Left for the owner:** send the email (name and Loom link to fill in), and consider turning Auto-Deploy off in Render after the last push so a late commit cannot redeploy the demo.
+- **Loom script:** `docs/LOOM_SCRIPT.md` was removed from `main` after the walkthrough was recorded (the longer shot-by-shot version is kept on the branch `docs/loom-walkthrough`; the history docs above still mention the file as it was at the time).
