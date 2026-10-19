@@ -143,7 +143,7 @@ at most 13% — and the other churned a year *before* its planted collapse and h
 - **Operations:** a whole-tenant cycle is one transaction (one bad account fails the tenant's cycle); a persistently failing tenant is retried every 30 s with no backoff; login attempts and
   the audit trail are not exported or paginated beyond the last 200 events.
 - **Containers:** verified on arm64 only; no amd64 build, no scan, no timing of the clean-machine path (see *Containers*).
-- **Presentation:** the deck is an `.pptx` built from `docs/DECK.md`; the Loom walkthrough is a **script** (`docs/LOOM_SCRIPT.md`) and has **not been recorded**; there is **no hosted URL yet**: the single-service image, the Render blueprint, the seed and a go/no-go probe are built and tested in Docker (`docs/HOSTING.md`, spec 003), but nothing is deployed, Render's acceptance of `render.yaml` and of the database user's privileges is unverified, and a free tier has no worker, sleeps when idle, and (Render) expires its database after 30 days.
+- **Presentation:** the deck is an `.pptx` built from `docs/DECK.md`; the Loom walkthrough is a **script** (`docs/LOOM_SCRIPT.md`) and has **not been recorded**; the **hosted demo is live** on Render's free tier (the URL and sign-in are given in the submission message, not in this repository): the single-service image, the Render blueprint, the seed and a go/no-go probe are in `docs/HOSTING.md` (spec 003). A free tier has no worker, sleeps when idle (the first request after an overnight idle took about 48 s to wake), and (Render) expires its database after 30 days; the request-role passwords are development defaults, so restrict the database's network access.
 
 ## What breaks first at 10×
 

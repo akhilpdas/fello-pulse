@@ -74,7 +74,7 @@ route or button for this; it cannot be triggered from the web.
 | The probe's verdicts | **Tested** locally against three kinds of user |
 | Render accepts `render.yaml` (it created the database and the service) | **Exercised** (2026-10-18) |
 | The database user's privileges | **Exercised, and wrong**: Render's login can create roles but not `BYPASSRLS`; the first deploy failed in migration 0002. Fixed (T023) and verified on a throwaway cluster with that kind of login; the redeploy on Render is still to be observed |
-| Free-tier cold start of ~1 minute | **Not exercised** |
+| Free-tier cold start of ~1 minute | **Exercised**: after an overnight idle the first request took 47.9 s, then ~0.8 s. Two shorter idle tests (17 min, ~1 h) never slept, so sleeping is not guaranteed at 15 minutes. The "waking the demo" UI message has not been seen on Render |
 | Railway deploy, cost and credit burn | **Not exercised** |
 | Reviewers using the URL at the same time | **Not exercised** |
 
